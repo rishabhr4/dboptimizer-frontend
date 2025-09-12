@@ -3,6 +3,8 @@ import apiClient, { setToken } from './axios-config'
 export interface DatabaseConnectionResponse {
   token: string
   monitoringEnabled: boolean
+  dbName: string
+  username: string
 }
 
 // Database connection function

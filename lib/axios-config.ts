@@ -44,6 +44,15 @@ export const isTokenExpired = (token: string): boolean => {
   }
 }
 
+// Logout function that removes token and redirects to home
+export const logout = (): void => {
+  removeToken()
+  // Redirect to home page
+  if (typeof window !== 'undefined') {
+    window.location.href = '/'
+  }
+}
+
 // Create Axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: BACKEND_URL,
@@ -84,9 +93,7 @@ apiClient.interceptors.response.use(
   (error) => {
     // Handle 401 Unauthorized
     if (error.response?.status === 401) {
-      removeToken()
-      // You can redirect to login page here if needed
-      // window.location.href = '/'
+      logout()
     }
     
     // Handle network errors

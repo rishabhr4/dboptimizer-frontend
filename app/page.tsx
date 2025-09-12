@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useMutation } from "@tanstack/react-query"
 import { connectToDatabase, DatabaseConnectionResponse } from "@/lib/api"
+import { useDatabase } from "@/contexts/database-context"
 
 type ConnectionStatus = "idle" | "connecting" | "success" | "error"
 
@@ -27,14 +28,19 @@ export default function OnboardingPage() {
   })
   const { toast } = useToast()
   const router = useRouter()
+  const { setConnectionInfo } = useDatabase()
   
   const connectMutation = useMutation<DatabaseConnectionResponse, Error, any>({
     mutationFn: connectToDatabase,
     onSuccess: (data) => {
       setConnectionStatus("success")
+      
+      // Store connection info in context
+      setConnectionInfo(data)
+      
       toast({
         title: "Connection Successful",
-        description: `Successfully connected to your database! Monitoring: ${data.monitoringEnabled ? 'Enabled' : 'Disabled'}`,
+        description: `Successfully connected to ${data.dbName} as ${data.username}! Monitoring: ${data.monitoringEnabled ? 'Enabled' : 'Disabled'}`,
       })
       
       // Redirect to dashboard after success
@@ -99,6 +105,8 @@ export default function OnboardingPage() {
             <CardDescription>Enter your database credentials to establish a connection</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="host">Host</Label>
@@ -130,7 +138,7 @@ export default function OnboardingPage() {
                   <SelectValue placeholder="Select database type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="postgresql">PostgreSQL</SelectItem>
+                  <SelectItem value="postgres">PostgreSQL</SelectItem>
                   <SelectItem value="mysql">MySQL</SelectItem>
                   <SelectItem value="mariadb">MariaDB</SelectItem>
                   <SelectItem value="sqlite">SQLite</SelectItem>
