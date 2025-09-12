@@ -1,6 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
+// Example of using authenticated API calls:
+// import { useAuthenticatedQuery, useAuthenticatedMutation } from "@/hooks/use-authenticated-api"
+// 
+// const { data: metrics, isLoading } = useAuthenticatedQuery('/api/metrics')
+// const updateSettings = useAuthenticatedMutation('/api/settings', { method: 'PUT' })
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
