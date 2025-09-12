@@ -12,7 +12,6 @@ import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 
 type ConnectionStatus = "idle" | "connecting" | "success" | "error"
-
 export default function OnboardingPage() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle")
   const [formData, setFormData] = useState({
