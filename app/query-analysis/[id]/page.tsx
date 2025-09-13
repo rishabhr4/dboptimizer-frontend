@@ -210,7 +210,7 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Frequency</p>
-                  <p className="font-semibold">{mockQueryData.frequency}/hr</p>
+                  <p className="font-semibold">{mockQueryData.frequency}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
