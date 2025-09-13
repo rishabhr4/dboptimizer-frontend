@@ -5,69 +5,33 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Search, ArrowRight, Clock, Database } from "lucide-react"
+import { Search, ArrowRight, Clock, Database, AlertTriangle } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useAuthenticatedQuery } from "@/hooks/use-authenticated-api"
 
-// Mock data for queries
-const mockQueries = [
-  {
-    id: 1,
-    query: "SELECT u.*, p.title FROM users u JOIN posts p ON u.id = p.user_id WHERE u.created_at > ?",
-    avgTime: 1250,
-    frequency: 45,
-    lastRun: "2 minutes ago",
-    severity: "high",
-    database: "production_db",
-  },
-  {
-    id: 2,
-    query: "SELECT COUNT(*) FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.status = ?",
-    avgTime: 890,
-    frequency: 78,
-    lastRun: "5 minutes ago",
-    severity: "medium",
-    database: "production_db",
-  },
-  {
-    id: 3,
-    query:
-      "UPDATE inventory SET quantity = quantity - ? WHERE product_id IN (SELECT id FROM products WHERE category = ?)",
-    avgTime: 650,
-    frequency: 23,
-    lastRun: "8 minutes ago",
-    severity: "medium",
-    database: "production_db",
-  },
-  {
-    id: 4,
-    query: "SELECT * FROM analytics_events WHERE event_date BETWEEN ? AND ? ORDER BY created_at DESC",
-    avgTime: 2100,
-    frequency: 12,
-    lastRun: "12 minutes ago",
-    severity: "high",
-    database: "analytics_db",
-  },
-  {
-    id: 5,
-    query: "DELETE FROM temp_cache WHERE expires_at < NOW() AND user_id NOT IN (SELECT id FROM active_users)",
-    avgTime: 450,
-    frequency: 67,
-    lastRun: "15 minutes ago",
-    severity: "low",
-    database: "production_db",
-  },
-]
 
 export default function QueriesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedSeverity, setSelectedSeverity] = useState<string>("all")
+  const [isMounted, setIsMounted] = useState(false)
 
-  const filteredQueries = mockQueries.filter((query) => {
+  // API call to get all queries
+  const { data: queriesData, isLoading: isLoadingQueries, error: queriesError, refetch: refetchQueries } = useAuthenticatedQuery('/db/get-all-queries', {
+    enabled: typeof window !== 'undefined',
+    method: 'GET'
+  })
+
+  // Initialize on client side to prevent hydration issues
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  const filteredQueries = queriesData?.logs?.filter((query: any) => {
     const matchesSearch = query.query.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesSeverity = selectedSeverity === "all" || query.severity === selectedSeverity
     return matchesSearch && matchesSeverity
-  })
+  }) || []
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -159,45 +123,69 @@ export default function QueriesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Query</TableHead>
-                  <TableHead>Database</TableHead>
                   <TableHead>Avg Time</TableHead>
                   <TableHead>Frequency</TableHead>
-                  <TableHead>Last Run</TableHead>
                   <TableHead>Severity</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredQueries.map((query) => (
-                  <TableRow key={query.id}>
-                    <TableCell className="font-mono text-sm max-w-md">{truncateQuery(query.query)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Database className="h-4 w-4 text-muted-foreground" />
-                        {query.database}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-semibold">{query.avgTime}ms</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{query.frequency}/hr</TableCell>
-                    <TableCell className="text-muted-foreground">{query.lastRun}</TableCell>
-                    <TableCell>
-                      <Badge className={getSeverityColor(query.severity)}>{query.severity}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button asChild variant="ghost" size="sm">
-                        <Link href={`/query-analysis/${query.id}`}>
-                          Analyze
-                          <ArrowRight className="ml-2 h-4 w-4" />
-                        </Link>
-                      </Button>
+                {!isMounted ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      Loading...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : isLoadingQueries ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      Loading queries...
+                    </TableCell>
+                  </TableRow>
+                ) : queriesError ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-destructive">
+                      <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                      Error loading queries: {queriesError.message}
+                    </TableCell>
+                  </TableRow>
+                ) : !queriesData?.logs?.length ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      No queries found
+                    </TableCell>
+                  </TableRow>
+                ) : filteredQueries.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      No queries match your filters
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredQueries.map((query: any) => (
+                    <TableRow key={query.id}>
+                      <TableCell className="font-mono text-sm max-w-md">{truncateQuery(query.query)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-semibold">{query.avgTime}ms</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{query.frequency}/hr</TableCell>
+                      <TableCell>
+                        <Badge className={getSeverityColor(query.severity)}>{query.severity}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button asChild variant="ghost" size="sm">
+                          <Link href={`/query-analysis/${query.id}`}>
+                            Analyze
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
