@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAuthenticatedQuery } from "@/hooks/use-authenticated-api"
+import { useAuthenticatedMutation, useAuthenticatedQuery } from "@/hooks/use-authenticated-api"
 import { useDatabase } from "@/contexts/database-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -34,6 +34,7 @@ export default function DashboardPage() {
     enabled: typeof window !== 'undefined',
     method: 'GET'
   })
+
 
   // Initialize on client side to prevent hydration issues
   useEffect(() => {

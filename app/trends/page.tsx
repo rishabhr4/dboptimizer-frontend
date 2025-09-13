@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { TrendingUp, TrendingDown, Bell } from "lucide-react"
+import QueryAlertPopup from "@/components/ui/alert-queries"
 
 // Mock data for trends and alerts
 const mockAlerts = [
@@ -99,7 +100,7 @@ export default function TrendsPage() {
       </div>
 
       {/* Performance Trends */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {mockTrends.map((trend, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -114,10 +115,10 @@ export default function TrendsPage() {
               </p>
             </CardContent>
           </Card>
-        ))}
-      </div>
+        ))} */}
+      {/* </div> */}
 
-      {/* Performance Charts Placeholder */}
+      {/* Performance Charts Placeholder
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -142,7 +143,7 @@ export default function TrendsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </div> */}
 
       {/* Active Alerts */}
       <Card>
@@ -199,6 +200,11 @@ export default function TrendsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Alert Queries button at the bottom */}
+      <div className="flex justify-end">
+        <QueryAlertPopup />
+      </div>
     </div>
   )
 }
