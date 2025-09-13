@@ -9,14 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Send, Bot, User, Copy, Lightbulb, Database, TrendingUp } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-
-interface Message {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  timestamp: Date
-  suggestions?: string[]
-}
+import { useAIChat, type Message } from "@/hooks/use-ai-chat"
 
 const initialMessages: Message[] = [
   {
@@ -42,11 +35,17 @@ What would you like to know about your database performance?`,
 ]
 
 export default function CopilotPage() {
-  const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [input, setInput] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
+  
+  // Use the custom AI chat hook
+  const { messages, isStreaming, sendMessage, initializeChat } = useAIChat()
+
+  // Initialize chat with welcome message
+  useEffect(() => {
+    initializeChat(initialMessages)
+  }, [initializeChat])
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -56,174 +55,10 @@ export default function CopilotPage() {
 
   const handleSend = async (message?: string) => {
     const messageText = message || input.trim()
-    if (!messageText || isLoading) return
+    if (!messageText || isStreaming) return
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: messageText,
-      timestamp: new Date(),
-    }
-
-    setMessages((prev) => [...prev, userMessage])
     setInput("")
-    setIsLoading(true)
-
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse = generateAIResponse(messageText)
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: aiResponse.content,
-        timestamp: new Date(),
-        suggestions: aiResponse.suggestions,
-      }
-
-      setMessages((prev) => [...prev, assistantMessage])
-      setIsLoading(false)
-    }, 1500)
-  }
-
-  const generateAIResponse = (userMessage: string): { content: string; suggestions?: string[] } => {
-    const lowerMessage = userMessage.toLowerCase()
-
-    if (lowerMessage.includes("slow") || lowerMessage.includes("performance")) {
-      return {
-        content: `I can help you identify and fix slow queries! Here are the most common causes and solutions:
-
-**Top 3 Performance Issues I'm Seeing:**
-
-1. **Missing Indexes** - Your users table scan is taking 1.2s
-   - Add: \`CREATE INDEX idx_users_created_at ON users (created_at);\`
-   - Expected improvement: 85% faster
-
-2. **Inefficient JOINs** - Posts table lacks composite index  
-   - Add: \`CREATE INDEX idx_posts_user_status ON posts (user_id, status);\`
-   - Expected improvement: 70% faster
-
-3. **Large Result Sets** - Consider pagination for queries returning >1000 rows
-
-**Quick Wins:**
-- Enable query caching for repeated dashboard queries
-- Use EXPLAIN ANALYZE to identify bottlenecks
-- Consider read replicas for reporting queries
-
-Would you like me to analyze a specific slow query?`,
-        suggestions: [
-          "Analyze my JOIN query",
-          "Show me index recommendations",
-          "How do I use EXPLAIN ANALYZE?",
-          "What about query caching?",
-        ],
-      }
-    }
-
-    if (lowerMessage.includes("index") || lowerMessage.includes("indexes")) {
-      return {
-        content: `Great question! Here are my index recommendations based on your current query patterns:
-
-**High Priority Indexes:**
-\`\`\`sql
--- For user lookups by creation date
-CREATE INDEX idx_users_created_at ON users (created_at);
-
--- For post filtering and joins  
-CREATE INDEX idx_posts_user_status ON posts (user_id, status);
-
--- For comment aggregations
-CREATE INDEX idx_comments_post_id ON comments (post_id);
-\`\`\`
-
-**Index Strategy Tips:**
-• Put most selective columns first in composite indexes
-• Avoid over-indexing (impacts INSERT/UPDATE performance)
-• Monitor index usage with pg_stat_user_indexes
-• Consider partial indexes for filtered queries
-
-**Expected Impact:**
-- Dashboard load time: 2.3s → 0.4s  
-- User query performance: 85% improvement
-- Overall database efficiency: +60%
-
-Want me to explain how any of these indexes work?`,
-        suggestions: [
-          "Explain composite indexes",
-          "How do I monitor index usage?",
-          "What about partial indexes?",
-          "Show me more optimization tips",
-        ],
-      }
-    }
-
-    if (lowerMessage.includes("join") || lowerMessage.includes("joins")) {
-      return {
-        content: `JOIN performance issues are very common! Let me help you optimize them:
-
-**Your Current JOIN Issues:**
-1. **Hash Join on large tables** - users ⋈ posts taking 800ms
-2. **Missing foreign key indexes** - posts.user_id needs indexing  
-3. **Wrong join order** - Filter early, join late
-
-**Optimization Strategy:**
-\`\`\`sql
--- Before: Slow nested loops
-SELECT u.name, p.title 
-FROM users u 
-JOIN posts p ON u.id = p.user_id 
-WHERE u.created_at > '2024-01-01';
-
--- After: Optimized with proper indexing
-SELECT u.name, p.title 
-FROM users u 
-JOIN posts p ON u.id = p.user_id 
-WHERE u.created_at > '2024-01-01'
--- Indexes: users(created_at), posts(user_id)
-\`\`\`
-
-**JOIN Performance Tips:**
-• Index all foreign key columns
-• Filter before joining when possible  
-• Use EXISTS instead of IN for large subqueries
-• Consider denormalization for frequently joined data
-
-Performance gain expected: 75% faster execution!`,
-        suggestions: [
-          "Show me EXISTS vs IN examples",
-          "How do I optimize subqueries?",
-          "What about LEFT JOIN performance?",
-          "Explain denormalization strategies",
-        ],
-      }
-    }
-
-    // Default response
-    return {
-      content: `I'd be happy to help with that! As your database performance copilot, I can assist with:
-
-**Query Optimization:**
-- Analyzing execution plans
-- Suggesting better query structures  
-- Index recommendations
-
-**Performance Monitoring:**
-- Identifying bottlenecks
-- Setting up alerts
-- Tracking query performance over time
-
-**Best Practices:**
-- Schema design recommendations
-- Caching strategies
-- Scaling considerations
-
-Could you share more details about what specific database performance challenge you're facing? For example, you could paste a slow query or describe what's running slowly.`,
-      suggestions: [
-        "I have a slow query to analyze",
-        "My dashboard is loading slowly",
-        "Help me understand execution plans",
-        "What indexes should I add?",
-      ],
-    }
+    await sendMessage(messageText)
   }
 
   const copyToClipboard = (text: string) => {
@@ -355,7 +190,7 @@ Could you share more details about what specific database performance challenge 
                       )}
                     </div>
                   ))}
-                  {isLoading && (
+                  {isStreaming && (
                     <div className="flex gap-3">
                       <Avatar className="h-8 w-8">
                         <AvatarFallback className="bg-primary text-primary-foreground">
@@ -391,9 +226,9 @@ Could you share more details about what specific database performance challenge 
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={(e) => e.key === "Enter" && handleSend()}
-                    disabled={isLoading}
+                    disabled={isStreaming}
                   />
-                  <Button onClick={() => handleSend()} disabled={!input.trim() || isLoading}>
+                  <Button onClick={() => handleSend()} disabled={!input.trim() || isStreaming}>
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>
