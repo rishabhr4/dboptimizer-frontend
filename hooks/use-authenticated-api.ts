@@ -41,12 +41,31 @@ export const useAuthenticatedQuery = <TData = any>(
     enabled?: boolean
     staleTime?: number
     refetchOnWindowFocus?: boolean
+    method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
     params?: any
+    data?: any
   }
 ) => {
   return useQuery<TData, Error>({
-    queryKey: [endpoint, options?.params],
-    queryFn: () => api.get<TData>(endpoint, { params: options?.params }),
+    queryKey: [endpoint, options?.params, options?.data],
+    queryFn: () => {
+      const method = options?.method || 'GET'
+      
+      switch (method) {
+        case 'GET':
+          return api.get<TData>(endpoint, { params: options?.params })
+        case 'POST':
+          return api.post<TData>(endpoint, options?.data || {})
+        case 'PUT':
+          return api.put<TData>(endpoint, options?.data || {})
+        case 'PATCH':
+          return api.patch<TData>(endpoint, options?.data || {})
+        case 'DELETE':
+          return api.delete<TData>(endpoint, { params: options?.params })
+        default:
+          return api.get<TData>(endpoint, { params: options?.params })
+      }
+    },
     enabled: options?.enabled ?? true,
     staleTime: options?.staleTime ?? 5 * 60 * 1000, // 5 minutes default
     refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
