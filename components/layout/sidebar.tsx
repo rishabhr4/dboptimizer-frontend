@@ -87,7 +87,7 @@ export function Sidebar({ className }: SidebarProps) {
               <div
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer",
-                  "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  "hover:bg-sidebar-accent -sidebar-accent-foreground",
                   isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground",
                 )}
               >

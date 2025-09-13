@@ -13,7 +13,7 @@ export const DropdownMenuTrigger = ({ children }: { children: React.ReactNode })
     <Menu.Button
       className={cn(
         "inline-flex items-center justify-center rounded-md bg-muted px-3 py-2 text-sm font-medium text-foreground",
-        "hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-accent transition"
+        "hover:bg-accent -accent-foreground focus:outline-none focus:ring-2 focus:ring-accent transition"
       )}
     >
       {children}
@@ -60,7 +60,7 @@ export const DropdownMenuItem = ({
             "relative flex text-start w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors",
             active
               ? "bg-accent text-accent-foreground"
-              : "text-foreground hover:bg-accent hover:text-accent-foreground"
+              : "text-foreground hover:bg-accent -accent-foreground"
           )}
         >
           {children}
@@ -88,7 +88,7 @@ export const DropdownMenuCheckboxItem = ({
             "relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors pl-8",
             active
               ? "bg-accent text-accent-foreground"
-              : "text-foreground hover:bg-accent hover:text-accent-foreground"
+              : "text-foreground hover:bg-accent -accent-foreground"
           )}
         >
           {checked && (
@@ -121,7 +121,7 @@ export const DropdownMenuRadioItem = ({
             "relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors pl-8",
             active
               ? "bg-accent text-accent-foreground"
-              : "text-foreground hover:bg-accent hover:text-accent-foreground"
+              : "text-foreground hover:bg-accent -accent-foreground"
           )}
         >
           {selected && (

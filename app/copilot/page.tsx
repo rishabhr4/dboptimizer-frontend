@@ -172,7 +172,7 @@ export default function CopilotPage() {
                               <Badge
                                 key={index}
                                 variant="outline"
-                                className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                                className="cursor-pointer hover:bg-primary -primary-foreground transition-colors"
                                 onClick={() => handleSend(suggestion)}
                               >
                                 {suggestion}

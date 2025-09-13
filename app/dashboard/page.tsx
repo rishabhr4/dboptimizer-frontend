@@ -218,7 +218,7 @@ export default function DashboardPage() {
                 <div className="grid gap-4">
                   {insightsData.suggestions.map((suggestion: any, index: number) => (
                     <div key={index} className="flex items-start gap-3 p-4 border rounded-lg bg-muted/50">
-                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground hover:text-primary-foreground flex items-center justify-center text-sm font-semibold">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground -primary-foreground flex items-center justify-center text-sm font-semibold">
                         {index + 1}
                       </div>
                       <div className="flex-1">
@@ -237,7 +237,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="pt-4 border-t">
                   <Link href="/copilot">
-                    <Button className="w-full hover:text-foreground hover:bg-background" variant="outline">
+                    <Button className="w-full -foreground hover:bg-background" variant="outline">
                       <MessageCircle className="h-4 w-4 mr-2" />
                       Get more suggestions with AI Chatbot
                     </Button>
