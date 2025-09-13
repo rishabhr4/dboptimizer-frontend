@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query'
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5001'
+const NEXT_PUBLIC_BACKEND_URL = process.env.NEXT_PUBLIC_NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
 interface AIQueryParams {
   prompt: string
@@ -25,7 +25,7 @@ export function useAIQuery() {
       let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
 
       try {
-        const response = await fetch(`${BACKEND_URL}/ai/stream`, {
+        const response = await fetch(`${NEXT_PUBLIC_BACKEND_URL}/ai/stream`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -124,7 +124,7 @@ export function useQueryOptimization() {
       let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
 
       try {
-        const response = await fetch(`${BACKEND_URL}/ai/stream`, {
+        const response = await fetch(`${NEXT_PUBLIC_BACKEND_URL}/ai/stream`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

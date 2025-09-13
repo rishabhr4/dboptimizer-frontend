@@ -12,57 +12,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Database, Clock, Activity, AlertTriangle, ArrowRight, RefreshCw, TrendingUp, Server } from "lucide-react"
 import Link from "next/link"
 
-// Mock data for demonstration
-const mockMetrics = {
-  totalQueries: 15420,
-  avgLatency: 245,
-  slowQueries: 23,
-  connectedDB: "production_db",
-}
-
-const mockSlowQueries = [
-  {
-    id: 1,
-    query: "SELECT u.*, p.title FROM users u JOIN posts p ON u.id = p.user_id WHERE u.created_at > ?",
-    avgTime: 1250,
-    frequency: 45,
-    lastRun: "2 minutes ago",
-    severity: "high",
-  },
-  {
-    id: 2,
-    query: "SELECT COUNT(*) FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.status = ?",
-    avgTime: 890,
-    frequency: 78,
-    lastRun: "5 minutes ago",
-    severity: "medium",
-  },
-  {
-    id: 3,
-    query:
-      "UPDATE inventory SET quantity = quantity - ? WHERE product_id IN (SELECT id FROM products WHERE category = ?)",
-    avgTime: 650,
-    frequency: 23,
-    lastRun: "8 minutes ago",
-    severity: "medium",
-  },
-  {
-    id: 4,
-    query: "SELECT * FROM analytics_events WHERE event_date BETWEEN ? AND ? ORDER BY created_at DESC",
-    avgTime: 2100,
-    frequency: 12,
-    lastRun: "12 minutes ago",
-    severity: "high",
-  },
-  {
-    id: 5,
-    query: "DELETE FROM temp_cache WHERE expires_at < NOW() AND user_id NOT IN (SELECT id FROM active_users)",
-    avgTime: 450,
-    frequency: 67,
-    lastRun: "15 minutes ago",
-    severity: "low",
-  },
-]
 
 export default function DashboardPage() {
   const [autoRefresh, setAutoRefresh] = useState(false)
@@ -70,9 +19,15 @@ export default function DashboardPage() {
   const [isMounted, setIsMounted] = useState(false)
   const { dbName, username, isConnected } = useDatabase()
 
-  // API call for query logs - disable on server to prevent hydration issues
-  const { data: queryLogsData, isLoading: isLoadingQueryLogs, error: queryLogsError } = useAuthenticatedQuery('/db/query-logs', {
-    enabled: typeof window !== 'undefined'
+  // API calls - disable on server to prevent hydration issues
+  const { data: metricsData, isLoading: isLoadingMetrics, error: metricsError, refetch: refetchMetrics } = useAuthenticatedQuery('/db/metric-data', {
+    enabled: typeof window !== 'undefined',
+    method: 'POST'
+  })
+
+  const { data: slowQueriesData, isLoading: isLoadingSlowQueries, error: slowQueriesError, refetch: refetchSlowQueries } = useAuthenticatedQuery('/db/top-k-slow-queries', {
+    enabled: typeof window !== 'undefined',
+    method: 'POST'
   })
 
   // Initialize on client side to prevent hydration issues
@@ -81,26 +36,24 @@ export default function DashboardPage() {
     setLastUpdated(new Date())
   }, [])
 
-  // Log the API response
-  useEffect(() => {
-    if (queryLogsData) {
-      console.log('Query logs API response:', queryLogsData)
-    }
-    if (queryLogsError) {
-      console.error('Query logs API error:', queryLogsError)
-    }
-  }, [queryLogsData, queryLogsError])
 
   useEffect(() => {
     let interval: NodeJS.Timeout
     if (autoRefresh) {
       interval = setInterval(() => {
         setLastUpdated(new Date())
-        // In a real app, this would trigger a data refresh
+        refetchMetrics()
+        refetchSlowQueries()
       }, 30000) // Refresh every 30 seconds
     }
     return () => clearInterval(interval)
-  }, [autoRefresh])
+  }, [autoRefresh, refetchMetrics, refetchSlowQueries])
+
+  const handleRefresh = () => {
+    setLastUpdated(new Date())
+    refetchMetrics()
+    refetchSlowQueries()
+  }
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -137,7 +90,7 @@ export default function DashboardPage() {
                 Auto-refresh
               </Label>
             </div>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleRefresh}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
@@ -152,10 +105,12 @@ export default function DashboardPage() {
               <Database className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockMetrics.totalQueries.toLocaleString()}</div>
+              <div className="text-2xl font-bold">
+                {isLoadingMetrics ? '...' : metricsData?.totalQueries?.toLocaleString() || '0'}
+              </div>
               <p className="text-xs text-muted-foreground">
                 <TrendingUp className="inline h-3 w-3 mr-1" />
-                +12% from last hour
+                {metricsError ? 'Error loading data' : 'Total queries executed'}
               </p>
             </CardContent>
           </Card>
@@ -166,8 +121,12 @@ export default function DashboardPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockMetrics.avgLatency}ms</div>
-              <p className="text-xs text-muted-foreground">-5ms from last hour</p>
+              <div className="text-2xl font-bold">
+                {isLoadingMetrics ? '...' : `${metricsData?.avgLatency || 0}ms`}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {metricsError ? 'Error loading data' : 'Average query latency'}
+              </p>
             </CardContent>
           </Card>
 
@@ -177,8 +136,12 @@ export default function DashboardPage() {
               <AlertTriangle className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">{mockMetrics.slowQueries}</div>
-              <p className="text-xs text-muted-foreground">Queries over 500ms</p>
+              <div className="text-2xl font-bold text-destructive">
+                {isLoadingMetrics ? '...' : metricsData?.slowQueries || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {metricsError ? 'Error loading data' : 'Queries over 500ms'}
+              </p>
             </CardContent>
           </Card>
 
@@ -211,7 +174,6 @@ export default function DashboardPage() {
                     <TableHead>Query</TableHead>
                     <TableHead>Avg Time</TableHead>
                     <TableHead>Frequency</TableHead>
-                    <TableHead>Last Run</TableHead>
                     <TableHead>Severity</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
@@ -219,46 +181,50 @@ export default function DashboardPage() {
                 <TableBody>
                   {!isMounted ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">
+                      <TableCell colSpan={5} className="text-center py-8">
                         Loading...
                       </TableCell>
                     </TableRow>
-                  ) : isLoadingQueryLogs ? (
+                  ) : isLoadingSlowQueries ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">
-                        Loading query logs...
+                      <TableCell colSpan={5} className="text-center py-8">
+                        Loading slow queries...
                       </TableCell>
                     </TableRow>
-                  ) : queryLogsError ? (
+                  ) : slowQueriesError ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-destructive">
-                        Error loading query logs. Using mock data for now.
+                      <TableCell colSpan={5} className="text-center py-8 text-destructive">
+                        Error loading slow queries: {slowQueriesError.message}
                       </TableCell>
                     </TableRow>
-                  ) : null}
-                  
-                  {/* Use API data if available, otherwise fall back to mockSlowQueries for development */}
-                  {isMounted && (mockSlowQueries)?.map((query: any) => (
-                    <TableRow key={query.id}>
-                      <TableCell className="font-mono text-sm max-w-md">{truncateQuery(query.query)}</TableCell>
-                      <TableCell>
-                        <span className="font-semibold">{query.avgTime}ms</span>
+                  ) : !slowQueriesData?.logs?.length ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No slow queries found
                       </TableCell>
-                      <TableCell>{query.frequency}/hr</TableCell>
-                      <TableCell className="text-muted-foreground">{query.lastRun}</TableCell>
-                      <TableCell>
-                        <Badge className={getSeverityColor(query.severity)}>{query.severity}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button asChild variant="ghost" size="sm">
-                          <Link href={`/query-analysis/${query.id}`}>
-                            Analyze
-                            <ArrowRight className="ml-2 h-4 w-4" />
+                    </TableRow>
+                  ) : (
+                    slowQueriesData.logs.map((query: any, index: number) => (
+                      <TableRow key={query.id || index}>
+                        <TableCell className="font-mono text-sm max-w-md">{truncateQuery(query.query)}</TableCell>
+                        <TableCell>
+                          <span className="font-semibold">{query.avgTime}ms</span>
+                        </TableCell>
+                        <TableCell>{query.frequency}/hr</TableCell>
+                        <TableCell>
+                          <Badge className={getSeverityColor(query.severity)}>{query.severity}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/query-analysis/${query.id || index}`}>
+                            <Button variant="ghost" size="sm">
+                              Analyze
+                              <ArrowRight className="ml-2 h-4 w-4" />
+                            </Button>
                           </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>

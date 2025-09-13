@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5001'
+const NEXT_PUBLIC_BACKEND_URL = process.env.NEXT_PUBLIC_NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
 // Token management utilities
 export const TOKEN_KEY = 'db_optimizer_token'
@@ -55,7 +55,7 @@ export const logout = (): void => {
 
 // Create Axios instance
 const apiClient: AxiosInstance = axios.create({
-  baseURL: BACKEND_URL,
+  baseURL: NEXT_PUBLIC_BACKEND_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

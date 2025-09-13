@@ -28,7 +28,7 @@ interface StreamChatResponse {
   error?: string
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5001'
+const NEXT_PUBLIC_BACKEND_URL = process.env.NEXT_PUBLIC_NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
 // Custom hook for streaming AI chat
 export function useAIChat() {
@@ -38,7 +38,7 @@ export function useAIChat() {
 
   const streamChatMutation = useMutation<StreamChatResponse, Error, StreamChatParams>({
     mutationFn: async ({ prompt, system, history, model }) => {
-      const response = await fetch(`${BACKEND_URL}/ai/stream`, {
+      const response = await fetch(`${NEXT_PUBLIC_BACKEND_URL}/ai/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -118,7 +118,7 @@ export function useAIChat() {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
-      console.log("📡 Making fetch request to:", `${BACKEND_URL}/ai/stream`);
+      console.log("📡 Making fetch request to:", `${NEXT_PUBLIC_BACKEND_URL}/ai/stream`);
       console.log("📤 Request body:", {
         prompt: messageText,
         system: systemPrompt || `You are a database performance expert and copilot. Help users optimize their database queries, suggest indexes, explain execution plans, and provide best practices for database performance. Be specific, actionable, and include code examples when relevant.`,
@@ -126,7 +126,7 @@ export function useAIChat() {
         model: "gemini-2.5-pro"
       });
 
-      const response = await fetch(`${BACKEND_URL}/ai/stream`, {
+      const response = await fetch(`${NEXT_PUBLIC_BACKEND_URL}/ai/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
