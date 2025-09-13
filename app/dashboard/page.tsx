@@ -215,12 +215,12 @@ export default function DashboardPage() {
                           <Badge className={getSeverityColor(query.severity)}>{query.severity}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button asChild variant="ghost" size="sm">
-                            <Link href={`/query-analysis/${query.id || index}`}>
+                          <Link href={`/query-analysis/${query.id || index}`}>
+                            <Button variant="ghost" size="sm">
                               Analyze
                               <ArrowRight className="ml-2 h-4 w-4" />
-                            </Link>
-                          </Button>
+                            </Button>
+                          </Link>
                         </TableCell>
                       </TableRow>
                     ))
