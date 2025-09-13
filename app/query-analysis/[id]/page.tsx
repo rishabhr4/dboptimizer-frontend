@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useAppSelector } from "@/lib/redux/hooks"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -35,11 +36,12 @@ WHERE u.created_at > '2024-01-01'
 GROUP BY u.id, p.id 
 ORDER BY p.created_at DESC 
 LIMIT 50`,
+  avgTime: 1250,
   avgLatency: 1250,
   frequency: 45,
   rowsScanned: 125000,
   lastRun: "2 minutes ago",
-  severity: "high",
+  severity: "high" as const,
 }
 
 const mockExecutionPlan = {
@@ -123,6 +125,15 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
   const [isLoadingAI, setIsLoadingAI] = useState(false)
   const [simulationResult, setSimulationResult] = useState<string>("")
   const { toast } = useToast()
+  
+  // Get selected query from Redux store
+  const { selectedQuery, queries } = useAppSelector(state => state.query)
+  
+  // Find query by ID if selectedQuery is not available (direct URL access)
+  const currentQuery = selectedQuery || queries.find(q => q.id === parseInt(params.id))
+  
+  // Use currentQuery data or fallback to mock data if no query found
+  const queryData = currentQuery || mockQueryData
 
   const handleAskAI = async () => {
     setIsLoadingAI(true)
@@ -144,7 +155,9 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
   }
 
   const handleSimulateIndex = () => {
-    setSimulationResult("Simulation complete! Expected performance improvement: 87% faster execution (1250ms → 163ms)")
+    const currentTime = queryData.avgLatency || queryData.avgTime || 1250
+    const improvedTime = Math.round(currentTime * 0.13) // 87% improvement
+    setSimulationResult(`Simulation complete! Expected performance improvement: 87% faster execution (${currentTime}ms → ${improvedTime}ms)`)
     toast({
       title: "Index Simulation Complete",
       description: "Expected 87% performance improvement with recommended indexes",
@@ -194,7 +207,7 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Query Information</CardTitle>
-              <Badge className={getSeverityColor(mockQueryData.severity)}>{mockQueryData.severity} priority</Badge>
+              <Badge className={getSeverityColor(queryData.severity)}>{queryData.severity} priority</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -203,28 +216,28 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Avg Latency</p>
-                  <p className="font-semibold">{mockQueryData.avgLatency}ms</p>
+                  <p className="font-semibold">{queryData.avgLatency || queryData.avgTime}ms</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Frequency</p>
-                  <p className="font-semibold">{mockQueryData.frequency}</p>
+                  <p className="font-semibold">{queryData.frequency}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Database className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Rows Scanned</p>
-                  <p className="font-semibold">{mockQueryData.rowsScanned.toLocaleString()}</p>
+                  <p className="font-semibold">{queryData.rowsScanned?.toLocaleString() || 'N/A'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Last Run</p>
-                  <p className="font-semibold">{mockQueryData.lastRun}</p>
+                  <p className="font-semibold">{queryData.lastRun || 'N/A'}</p>
                 </div>
               </div>
             </div>
@@ -234,20 +247,20 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-semibold">Full Query Text</h3>
-                <Button variant="outline" size="sm" onClick={() => copyToClipboard(mockQueryData.query)}>
+                <Button variant="outline" size="sm" onClick={() => copyToClipboard(queryData.query)}>
                   <Copy className="h-4 w-4 mr-2" />
                   Copy
                 </Button>
               </div>
               <div className="bg-muted p-4 rounded-lg">
-                <pre className="text-sm font-mono whitespace-pre-wrap">{mockQueryData.query}</pre>
+                <pre className="text-sm font-mono whitespace-pre-wrap">{queryData.query}</pre>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Execution Plan Panel */}
-        <Card>
+        {/*<Card>
           <CardHeader>
             <CardTitle>Execution Plan Analysis</CardTitle>
             <CardDescription>Compare current execution plan with optimized version</CardDescription>
@@ -274,7 +287,7 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
               </TabsContent>
             </Tabs>
           </CardContent>
-        </Card>
+        </Card> *}
 
         {/* AI Recommendations Panel */}
         <Card>

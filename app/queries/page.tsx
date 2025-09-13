@@ -9,12 +9,17 @@ import { Search, ArrowRight, Clock, Database, AlertTriangle } from "lucide-react
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { useAuthenticatedQuery } from "@/hooks/use-authenticated-api"
+import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks"
+import { setQueries, setLoading, setError, selectQuery } from "@/lib/redux/slices/querySlice"
 
 
 export default function QueriesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedSeverity, setSelectedSeverity] = useState<string>("all")
   const [isMounted, setIsMounted] = useState(false)
+  
+  const dispatch = useAppDispatch()
+  const { queries: reduxQueries, isLoading: reduxLoading } = useAppSelector(state => state.query)
 
   // API call to get all queries
   const { data: queriesData, isLoading: isLoadingQueries, error: queriesError, refetch: refetchQueries } = useAuthenticatedQuery('/db/get-all-queries', {
@@ -27,11 +32,36 @@ export default function QueriesPage() {
     setIsMounted(true)
   }, [])
 
-  const filteredQueries = queriesData?.logs?.filter((query: any) => {
+  // Dispatch queries data to Redux when API data changes
+  useEffect(() => {
+    if (queriesData?.logs) {
+      dispatch(setQueries(queriesData.logs))
+    }
+  }, [queriesData, dispatch])
+
+  // Dispatch loading state to Redux
+  useEffect(() => {
+    dispatch(setLoading(isLoadingQueries))
+  }, [isLoadingQueries, dispatch])
+
+  // Dispatch error state to Redux
+  useEffect(() => {
+    if (queriesError) {
+      dispatch(setError(queriesError.message))
+    }
+  }, [queriesError, dispatch])
+
+  // Use Redux queries data for filtering
+  const filteredQueries = reduxQueries.filter((query: any) => {
     const matchesSearch = query.query.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesSeverity = selectedSeverity === "all" || query.severity === selectedSeverity
     return matchesSearch && matchesSeverity
-  }) || []
+  })
+
+  // Handle analyze click - select query and navigate
+  const handleAnalyzeClick = (query: any) => {
+    dispatch(selectQuery(query))
+  }
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -149,7 +179,7 @@ export default function QueriesPage() {
                       Error loading queries: {queriesError.message}
                     </TableCell>
                   </TableRow>
-                ) : !queriesData?.logs?.length ? (
+                ) : !reduxQueries.length ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       No queries found
@@ -176,7 +206,7 @@ export default function QueriesPage() {
                         <Badge className={getSeverityColor(query.severity)}>{query.severity}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button asChild variant="ghost" size="sm">
+                        <Button asChild variant="ghost" size="sm" onClick={() => handleAnalyzeClick(query)}>
                           <Link href={`/query-analysis/${query.id}`}>
                             Analyze
                             <ArrowRight className="ml-2 h-4 w-4" />

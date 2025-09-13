@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/toaster"
 import { QueryProvider } from "@/lib/query-client"
 import { DatabaseProvider } from "@/contexts/database-context"
+import { ReduxProvider } from "@/lib/redux/provider"
 import { AppLayout } from "@/components/layout/app-layout"
 import { Suspense } from "react"
 import "./globals.css"
@@ -24,17 +25,19 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <QueryProvider>
-          <DatabaseProvider>
-            <AppLayout>
-              <Suspense fallback={null}>
-                {children}
-                <Toaster />
-                <Analytics />
-              </Suspense>
-            </AppLayout>
-          </DatabaseProvider>
-        </QueryProvider>
+        <ReduxProvider>
+          <QueryProvider>
+            <DatabaseProvider>
+              <AppLayout>
+                <Suspense fallback={null}>
+                  {children}
+                  <Toaster />
+                  <Analytics />
+                </Suspense>
+              </AppLayout>
+            </DatabaseProvider>
+          </QueryProvider>
+        </ReduxProvider>
       </body>
     </html>
   )
