@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Database, Clock, Activity, AlertTriangle, ArrowRight, RefreshCw, TrendingUp, Server } from "lucide-react"
+import { Database, Clock, Activity, AlertTriangle, ArrowRight, RefreshCw, TrendingUp, Server, Lightbulb, MessageCircle } from "lucide-react"
 import Link from "next/link"
 
 
@@ -22,12 +22,17 @@ export default function DashboardPage() {
   // API calls - disable on server to prevent hydration issues
   const { data: metricsData, isLoading: isLoadingMetrics, error: metricsError, refetch: refetchMetrics } = useAuthenticatedQuery('/db/metric-data', {
     enabled: typeof window !== 'undefined',
-    method: 'POST'
+    method: 'GET'
   })
 
   const { data: slowQueriesData, isLoading: isLoadingSlowQueries, error: slowQueriesError, refetch: refetchSlowQueries } = useAuthenticatedQuery('/db/top-k-slow-queries', {
     enabled: typeof window !== 'undefined',
     method: 'POST'
+  })
+
+  const { data: insightsData, isLoading: isLoadingInsights, error: insightsError, refetch: refetchInsights } = useAuthenticatedQuery('/db/get-insights', {
+    enabled: typeof window !== 'undefined',
+    method: 'GET'
   })
 
   // Initialize on client side to prevent hydration issues
@@ -44,15 +49,17 @@ export default function DashboardPage() {
         setLastUpdated(new Date())
         refetchMetrics()
         refetchSlowQueries()
+        refetchInsights()
       }, 30000) // Refresh every 30 seconds
     }
     return () => clearInterval(interval)
-  }, [autoRefresh, refetchMetrics, refetchSlowQueries])
+  }, [autoRefresh, refetchMetrics, refetchSlowQueries, refetchInsights])
 
   const handleRefresh = () => {
     setLastUpdated(new Date())
     refetchMetrics()
     refetchSlowQueries()
+    refetchInsights()
   }
 
   const getSeverityColor = (severity: string) => {
@@ -159,6 +166,86 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Database Insights Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5 text-yellow-500" />
+              Database Insights
+            </CardTitle>
+            <CardDescription>AI-powered suggestions to improve your database performance</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!isMounted ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-muted-foreground mt-2">Loading insights...</p>
+              </div>
+            ) : isLoadingInsights ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-muted-foreground mt-2">Loading insights...</p>
+              </div>
+            ) : insightsError ? (
+              <div className="text-center py-8 text-destructive">
+                <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                <p>Error loading insights: {insightsError.message}</p>
+              </div>
+            ) : !insightsData?.suggestions?.length ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Lightbulb className="h-8 w-8 mx-auto mb-2" />
+                <p className="mb-2">{insightsData?.message || "No insights available at the moment"}</p>
+                {insightsData?.lastUpdated && (
+                  <p className="text-xs">
+                    Last updated: {new Date(insightsData.lastUpdated).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Message and Last Updated */}
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <p>{insightsData?.message || "Top 3 database optimization suggestions"}</p>
+                  {insightsData?.lastUpdated && (
+                    <p className="text-xs">
+                      Updated: {new Date(insightsData.lastUpdated).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                
+                <div className="grid gap-4">
+                  {insightsData.suggestions.map((suggestion: any, index: number) => (
+                    <div key={index} className="flex items-start gap-3 p-4 border rounded-lg bg-muted/50">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-sm mb-1">{suggestion.title || `Suggestion ${index + 1}`}</h4>
+                        <p className="text-sm text-muted-foreground">{suggestion.description || suggestion}</p>
+                        {suggestion.impact && (
+                          <div className="mt-2">
+                            <Badge variant="secondary" className="text-xs">
+                              Impact: {suggestion.impact}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="pt-4 border-t">
+                  <Link href="/copilot">
+                    <Button className="w-full" variant="outline">
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Get more suggestions with AI Chatbot
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Slow Queries Table */}
         <Card>
