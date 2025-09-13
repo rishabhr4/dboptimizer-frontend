@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Bell, Moon, Sun, User, LogOut, Settings } from "lucide-react"
 import { useTheme } from "next-themes"
+import { logout } from "@/lib/axios-config"
 
 export function Header() {
   const { setTheme, theme } = useTheme()
@@ -24,8 +25,8 @@ export function Header() {
 
       <div className="flex items-center gap-4">
         {/* Notifications */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        <DropdownMenu >
+          <DropdownMenuTrigger >
             <Button variant="ghost" size="sm" className="relative">
               <Bell className="h-4 w-4" />
               <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">3</Badge>
@@ -64,7 +65,7 @@ export function Header() {
 
         {/* User Menu */}
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          <DropdownMenuTrigger>
             <Button variant="ghost" size="sm">
               <User className="h-4 w-4" />
             </Button>
@@ -76,7 +77,7 @@ export function Header() {
               <Settings className="mr-2 h-4 w-4" />
               Settings
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={logout}>
               <LogOut className="mr-2 h-4 w-4" />
               Log out
             </DropdownMenuItem>

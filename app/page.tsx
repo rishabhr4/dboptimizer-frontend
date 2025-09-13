@@ -10,6 +10,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Database, CheckCircle, XCircle, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
+import { useMutation } from "@tanstack/react-query"
+import { connectToDatabase, DatabaseConnectionResponse } from "@/lib/api"
+import { useDatabase } from "@/contexts/database-context"
 
 type ConnectionStatus = "idle" | "connecting" | "success" | "error"
 export default function OnboardingPage() {
@@ -24,45 +27,63 @@ export default function OnboardingPage() {
   })
   const { toast } = useToast()
   const router = useRouter()
-
-  const handleConnect = async () => {
-    setConnectionStatus("connecting")
-
-    // Simulate API call
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Mock success for demo
+  const { setConnectionInfo } = useDatabase()
+  
+  const connectMutation = useMutation<DatabaseConnectionResponse, Error, any>({
+    mutationFn: connectToDatabase,
+    onSuccess: (data) => {
       setConnectionStatus("success")
+      
+      // Store connection info in context
+      setConnectionInfo(data)
+      
       toast({
         title: "Connection Successful",
-        description: "Successfully connected to your database!",
+        description: `Successfully connected to ${data.dbName} as ${data.username}! Monitoring: ${data.monitoringEnabled ? 'Enabled' : 'Disabled'}`,
       })
-
+      
       // Redirect to dashboard after success
       setTimeout(() => {
         router.push("/dashboard")
       }, 1500)
-    } catch (error) {
+    },
+    onError: (error) => {
       setConnectionStatus("error")
       toast({
         title: "Connection Failed",
-        description: "Unable to connect to database. Please check your credentials.",
+        description: error.message || "Unable to connect to database. Please check your credentials.",
         variant: "destructive",
       })
     }
+  })
+
+  const handleConnect = () => {
+    setConnectionStatus("connecting")
+    
+    connectMutation.mutate({
+      url: false,
+      host: formData.host,
+      port: formData.port,
+      dbType: formData.dbType,
+      username: formData.username,
+      password: formData.password,
+      dbName: formData.dbName
+    })
   }
 
   const handleUseSampleDB = () => {
-    toast({
-      title: "Sample Database Loaded",
-      description: "Using demo database for exploration.",
+    setConnectionStatus("connecting")
+    
+    connectMutation.mutate({
+      url: true,
+      database_url: "postgresql://postgres.uyljxgsbcccxutilgwak:iit.fun%40iit@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?pgbouncer=true"
     })
-    router.push("/dashboard")
   }
 
   const isFormValid =
     formData.host && formData.port && formData.username && formData.password && formData.dbName && formData.dbType
+  
+  const isConnecting = connectMutation.isPending
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -83,6 +104,8 @@ export default function OnboardingPage() {
             <CardDescription>Enter your database credentials to establish a connection</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="host">Host</Label>
@@ -114,7 +137,7 @@ export default function OnboardingPage() {
                   <SelectValue placeholder="Select database type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="postgresql">PostgreSQL</SelectItem>
+                  <SelectItem value="postgres">PostgreSQL</SelectItem>
                   <SelectItem value="mysql">MySQL</SelectItem>
                   <SelectItem value="mariadb">MariaDB</SelectItem>
                   <SelectItem value="sqlite">SQLite</SelectItem>
@@ -153,7 +176,7 @@ export default function OnboardingPage() {
               />
             </div>
 
-            {connectionStatus !== "idle" && (
+            {(connectionStatus !== "idle" || isConnecting) && (
               <Alert
                 className={
                   connectionStatus === "success"
@@ -164,11 +187,11 @@ export default function OnboardingPage() {
                 }
               >
                 <div className="flex items-center gap-2">
-                  {connectionStatus === "connecting" && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {(connectionStatus === "connecting" || isConnecting) && <Loader2 className="h-4 w-4 animate-spin" />}
                   {connectionStatus === "success" && <CheckCircle className="h-4 w-4 text-primary" />}
                   {connectionStatus === "error" && <XCircle className="h-4 w-4 text-destructive" />}
                   <AlertDescription>
-                    {connectionStatus === "connecting" && "Connecting to database..."}
+                    {(connectionStatus === "connecting" || isConnecting) && "Connecting to database..."}
                     {connectionStatus === "success" && "Successfully connected to database!"}
                     {connectionStatus === "error" && "Failed to connect. Please check your credentials."}
                   </AlertDescription>
@@ -179,10 +202,10 @@ export default function OnboardingPage() {
             <div className="space-y-3">
               <Button
                 onClick={handleConnect}
-                disabled={!isFormValid || connectionStatus === "connecting"}
+                disabled={!isFormValid || isConnecting}
                 className="w-full"
               >
-                {connectionStatus === "connecting" ? (
+                {isConnecting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Connecting...
@@ -201,8 +224,20 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              <Button variant="outline" onClick={handleUseSampleDB} className="w-full bg-transparent">
-                Use Sample Database
+              <Button 
+                variant="outline" 
+                onClick={handleUseSampleDB} 
+                disabled={isConnecting}
+                className="w-full bg-transparent"
+              >
+                {isConnecting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  "Use Sample Database"
+                )}
               </Button>
             </div>
           </CardContent>

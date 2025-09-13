@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useAuthenticatedQuery } from "@/hooks/use-authenticated-api"
+import { useDatabase } from "@/contexts/database-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -64,7 +66,30 @@ const mockSlowQueries = [
 
 export default function DashboardPage() {
   const [autoRefresh, setAutoRefresh] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState(new Date())
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
+  const { dbName, username, isConnected } = useDatabase()
+
+  // API call for query logs - disable on server to prevent hydration issues
+  const { data: queryLogsData, isLoading: isLoadingQueryLogs, error: queryLogsError } = useAuthenticatedQuery('/db/query-logs', {
+    enabled: typeof window !== 'undefined'
+  })
+
+  // Initialize on client side to prevent hydration issues
+  useEffect(() => {
+    setIsMounted(true)
+    setLastUpdated(new Date())
+  }, [])
+
+  // Log the API response
+  useEffect(() => {
+    if (queryLogsData) {
+      console.log('Query logs API response:', queryLogsData)
+    }
+    if (queryLogsError) {
+      console.error('Query logs API error:', queryLogsError)
+    }
+  }, [queryLogsData, queryLogsError])
 
   useEffect(() => {
     let interval: NodeJS.Timeout
@@ -163,10 +188,10 @@ export default function DashboardPage() {
               <Server className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-lg font-semibold">{mockMetrics.connectedDB}</div>
+              <div className="text-lg font-semibold">{isConnected && dbName ? dbName : 'Not connected'}</div>
               <p className="text-xs text-muted-foreground">
-                <Activity className="inline h-3 w-3 mr-1 text-primary" />
-                Connected
+                <Activity className={`inline h-3 w-3 mr-1 ${isConnected ? 'text-primary' : 'text-destructive'}`} />
+                {isConnected ? `Connected as ${username}` : 'Disconnected'}
               </p>
             </CardContent>
           </Card>
@@ -192,7 +217,28 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockSlowQueries.map((query) => (
+                  {!isMounted ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        Loading...
+                      </TableCell>
+                    </TableRow>
+                  ) : isLoadingQueryLogs ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        Loading query logs...
+                      </TableCell>
+                    </TableRow>
+                  ) : queryLogsError ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-destructive">
+                        Error loading query logs. Using mock data for now.
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                  
+                  {/* Use API data if available, otherwise fall back to mockSlowQueries for development */}
+                  {isMounted && (mockSlowQueries)?.map((query: any) => (
                     <TableRow key={query.id}>
                       <TableCell className="font-mono text-sm max-w-md">{truncateQuery(query.query)}</TableCell>
                       <TableCell>
@@ -221,7 +267,7 @@ export default function DashboardPage() {
 
         {/* Last Updated */}
         <div className="text-center text-sm text-muted-foreground">
-          Last updated: {lastUpdated.toLocaleTimeString()}
+          Last updated: {lastUpdated ? lastUpdated.toLocaleTimeString() : 'Loading...'}
         </div>
       </div>
     </div>

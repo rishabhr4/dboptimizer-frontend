@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Database, Search, Bot, Settings, Menu, X, Home, TrendingUp } from "lucide-react"
+import { useDatabase } from "@/contexts/database-context"
 
 const navigation = [
   {
@@ -50,6 +51,7 @@ interface SidebarProps {
 export function Sidebar({ className }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const pathname = usePathname()
+  const { dbName, username, isConnected } = useDatabase()
 
   return (
     <div className={cn("flex flex-col h-full bg-sidebar border-r border-sidebar-border", className)}>
@@ -84,7 +86,7 @@ export function Sidebar({ className }: SidebarProps) {
             <Link key={item.name} href={item.href}>
               <div
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer",
                   "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground",
                 )}
@@ -112,8 +114,15 @@ export function Sidebar({ className }: SidebarProps) {
       {/* Footer */}
       <div className="p-4 border-t border-sidebar-border">
         <div className="flex items-center gap-2 text-xs text-sidebar-foreground/60">
-          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-          {!isCollapsed && <span>Connected to production_db</span>}
+          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+          {!isCollapsed && (
+            <span>
+              {isConnected && dbName && username 
+                ? `Connected to ${dbName} as ${username}`
+                : 'Not connected'
+              }
+            </span>
+          )}
         </div>
       </div>
     </div>
