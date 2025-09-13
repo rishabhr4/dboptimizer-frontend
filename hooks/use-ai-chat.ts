@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useToast } from '@/hooks/use-toast'
+import { getToken } from '@/lib/axios-config'
 
 export interface Message {
   id: string
@@ -28,7 +29,7 @@ interface StreamChatResponse {
   error?: string
 }
 
-const NEXT_PUBLIC_BACKEND_URL = process.env.NEXT_PUBLIC_NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+const NEXT_PUBLIC_BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
 // Custom hook for streaming AI chat
 export function useAIChat() {
@@ -118,6 +119,13 @@ export function useAIChat() {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
+      // Get JWT token for authentication
+      const token = getToken()
+      
+      if (!token) {
+        throw new Error('Authentication required. Please log in.')
+      }
+
       console.log("📡 Making fetch request to:", `${NEXT_PUBLIC_BACKEND_URL}/ai/stream`);
       console.log("📤 Request body:", {
         prompt: messageText,
@@ -130,6 +138,7 @@ export function useAIChat() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           prompt: messageText,
@@ -144,6 +153,11 @@ export function useAIChat() {
       console.log("📥 Response received:", response.status, response.statusText);
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Please log in again.')
+        } else if (response.status === 403) {
+          throw new Error('Access denied. Invalid token.')
+        }
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 

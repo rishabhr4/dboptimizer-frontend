@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
+import { useAnalyzeQuery } from "@/hooks/use-ai-query"
 
 // Mock data for the query analysis
 const mockQueryData = {
@@ -44,87 +45,65 @@ LIMIT 50`,
   severity: "high" as const,
 }
 
-const mockExecutionPlan = {
-  original: `Limit  (cost=15234.45..15234.57 rows=50 width=128)
-  ->  Sort  (cost=15234.45..15284.67 rows=20089 width=128)
-        Sort Key: p.created_at DESC
-        ->  HashAggregate  (cost=14234.12..14434.01 rows=20089 width=128)
-              Group Key: u.id, p.id
-              ->  Hash Left Join  (cost=8234.45..13234.56 rows=100000 width=96)
-                    Hash Cond: (p.id = r.post_id)
-                    ->  Hash Left Join  (cost=4234.12..8234.45 rows=100000 width=88)
-                          Hash Cond: (p.id = c.post_id)
-                          ->  Hash Join  (cost=1234.45..3234.56 rows=50000 width=80)
-                                Hash Cond: (u.id = p.user_id)
-                                ->  Seq Scan on users u  (cost=0.00..1234.45 rows=25000 width=40)
-                                      Filter: (created_at > '2024-01-01'::date)
-                                ->  Hash  (cost=1000.00..1000.00 rows=18750 width=48)
-                                      ->  Seq Scan on posts p  (cost=0.00..1000.00 rows=18750 width=48)
-                                            Filter: (status = 'published'::text)
-                          ->  Hash  (cost=2000.00..2000.00 rows=100000 width=16)
-                                ->  Seq Scan on comments c  (cost=0.00..2000.00 rows=100000 width=16)
-                    ->  Hash  (cost=3000.00..3000.00 rows=150000 width=16)
-                          ->  Seq Scan on ratings r  (cost=0.00..3000.00 rows=150000 width=16)`,
-
-  hypothetical: `Limit  (cost=234.45..234.57 rows=50 width=128)
-  ->  Sort  (cost=234.45..284.67 rows=20089 width=128)
-        Sort Key: p.created_at DESC
-        ->  HashAggregate  (cost=134.12..334.01 rows=20089 width=128)
-              Group Key: u.id, p.id
-              ->  Nested Loop Left Join  (cost=34.45..234.56 rows=100000 width=96)
-                    ->  Nested Loop Left Join  (cost=24.12..134.45 rows=100000 width=88)
-                          ->  Nested Loop  (cost=14.45..84.56 rows=50000 width=80)
-                                ->  Index Scan using idx_users_created_at on users u  (cost=0.43..34.45 rows=25000 width=40)
-                                      Index Cond: (created_at > '2024-01-01'::date)
-                                ->  Index Scan using idx_posts_user_status on posts p  (cost=0.43..2.00 rows=2 width=48)
-                                      Index Cond: ((user_id = u.id) AND (status = 'published'::text))
-                          ->  Index Scan using idx_comments_post_id on comments c  (cost=0.43..2.00 rows=4 width=16)
-                                Index Cond: (post_id = p.id)
-                    ->  Index Scan using idx_ratings_post_id on ratings r  (cost=0.43..2.00 rows=6 width=16)
-                          Index Cond: (post_id = p.id)`,
-}
-
-const mockRecommendations = {
-  indexes: [
+// AI Response Mock Data - matching the exact structure that will come from backend
+const mockAIResponse = {
+  success: true,
+  generalDescription: "Based on your query analysis, here are my recommendations:\n\n1. **Critical Index Missing**: The query is performing sequential scans on the users table. Adding an index on users.created_at will dramatically improve performance.\n\n2. **Join Order Optimization**: Moving the status filter into the JOIN condition will reduce the working set size earlier in the execution.\n\n3. **Aggregation Efficiency**: Including all selected columns in the GROUP BY clause will prevent potential issues and improve clarity.\n\n4. **Expected Performance Gain**: With the recommended indexes, this query should see a 85-90% reduction in execution time, from ~1250ms to ~150ms.\n\n5. **Monitoring Recommendation**: Set up alerts for queries exceeding 500ms execution time to catch performance regressions early.",
+  
+  recommendedIndexes: [
     {
       table: "users",
-      columns: ["created_at"],
-      sql: "CREATE INDEX idx_users_created_at ON users (created_at);",
-      impact: "High - Eliminates sequential scan on users table",
+      columns: "created_at",
+      priority: "High",
+      description: "Eliminates sequential scan on users table",
+      sqlStatement: "CREATE INDEX idx_users_created_at ON users (created_at);"
     },
     {
       table: "posts",
-      columns: ["user_id", "status"],
-      sql: "CREATE INDEX idx_posts_user_status ON posts (user_id, status);",
-      impact: "High - Enables efficient join and filtering",
+      columns: "user_id, status", 
+      priority: "High",
+      description: "Enables efficient join and filtering",
+      sqlStatement: "CREATE INDEX idx_posts_user_status ON posts (user_id, status);"
     },
     {
       table: "comments",
-      columns: ["post_id"],
-      sql: "CREATE INDEX idx_comments_post_id ON comments (post_id);",
-      impact: "Medium - Improves left join performance",
-    },
+      columns: "post_id",
+      priority: "Medium", 
+      description: "Improves left join performance",
+      sqlStatement: "CREATE INDEX idx_comments_post_id ON comments (post_id);"
+    }
   ],
-  queryRewrite: `-- Optimized version with better join order and filtering
-SELECT u.id, u.name, u.email, p.title, p.content, p.created_at, 
-    COUNT(c.id) as comment_count, AVG(r.rating) as avg_rating
-FROM users u 
-JOIN posts p ON u.id = p.user_id AND p.status = 'published'
-LEFT JOIN comments c ON p.id = c.post_id 
-LEFT JOIN ratings r ON p.id = r.post_id 
-WHERE u.created_at > '2024-01-01'
-GROUP BY u.id, u.name, u.email, p.id, p.title, p.content, p.created_at
-ORDER BY p.created_at DESC 
-LIMIT 50;`,
-  partitioning:
-    "Consider partitioning the posts table by created_at date for better performance on time-based queries.",
+  
+  optimizedQuery: {
+    description: "Optimized version with better join order and filtering",
+    sqlStatement: "SELECT u.id, u.name, u.email, p.title, p.content, p.created_at, COUNT(c.id) as comment_count, AVG(r.rating) as avg_rating FROM users u INNER JOIN posts p ON u.id = p.user_id AND p.status = 'published' LEFT JOIN comments c ON p.id = c.post_id LEFT JOIN ratings r ON p.id = r.post_id WHERE u.created_at > '2024-01-01' GROUP BY u.id, u.name, u.email, p.title, p.content, p.created_at ORDER BY p.created_at DESC"
+  }
+}
+
+// Define the expected API response type to match your backend
+interface AnalyzeQueryResponse {
+  success: boolean
+  generalDescription: string
+  recommendedIndexes: Array<{
+    table: string
+    columns: string
+    priority: string
+    description: string
+    sqlStatement: string
+  }>
+  optimizedQuery: {
+    description: string
+    sqlStatement: string
+  }
 }
 
 export default function QueryAnalysisPage({ params }: { params: { id: string } }) {
-  const [aiRecommendations, setAiRecommendations] = useState<string>("")
-  const [isLoadingAI, setIsLoadingAI] = useState(false)
+  const [aiAnalysisResult, setAiAnalysisResult] = useState<AnalyzeQueryResponse | null>(null)
   const [simulationResult, setSimulationResult] = useState<string>("")
   const { toast } = useToast()
+  
+  // Use the existing analyze query hook
+  const analyzeQueryMutation = useAnalyzeQuery()
   
   // Get selected query from Redux store
   const { selectedQuery, queries } = useAppSelector(state => state.query)
@@ -136,22 +115,30 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
   const queryData = currentQuery || mockQueryData
 
   const handleAskAI = async () => {
-    setIsLoadingAI(true)
-    // Simulate AI API call
-    setTimeout(() => {
-      setAiRecommendations(`Based on your query analysis, here are my recommendations:
-
-1. **Critical Index Missing**: The query is performing sequential scans on the users table. Adding an index on users.created_at will dramatically improve performance.
-
-2. **Join Order Optimization**: Moving the status filter into the JOIN condition will reduce the working set size earlier in the execution.
-
-3. **Aggregation Efficiency**: Including all selected columns in the GROUP BY clause will prevent potential issues and improve clarity.
-
-4. **Expected Performance Gain**: With the recommended indexes, this query should see a 85-90% reduction in execution time, from ~1250ms to ~150ms.
-
-5. **Monitoring Recommendation**: Set up alerts for queries exceeding 500ms execution time to catch performance regressions early.`)
-      setIsLoadingAI(false)
-    }, 2000)
+    try {
+      console.log("🚀 Starting AI analysis for query ID:", params.id)
+      
+      const result = await analyzeQueryMutation.mutateAsync({ id: params.id })
+      
+      console.log("📊 AI Analysis result:", result)
+      
+      if (result.success) {
+        setAiAnalysisResult(result)
+        toast({
+          title: "AI Analysis Complete",
+          description: "Query optimization recommendations generated successfully",
+        })
+      } else {
+        throw new Error('Analysis failed - success flag is false')
+      }
+    } catch (error: any) {
+      console.error('❌ AI Analysis Error:', error)
+      toast({
+        title: "Analysis Failed",
+        description: error.message || "Failed to analyze query. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
   const handleSimulateIndex = () => {
@@ -185,15 +172,31 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
     }
   }
 
+  const getPriorityColor = (priority: string) => {
+    switch (priority.toLowerCase()) {
+      case "high":
+        return "bg-destructive text-destructive-foreground"
+      case "medium":
+        return "bg-yellow-500 text-white"
+      case "low":
+        return "bg-blue-500 text-white"
+      default:
+        return "bg-muted text-muted-foreground"
+    }
+  }
+
+  // Update the loading state to use the mutation's pending state
+  const isLoadingAI = analyzeQueryMutation.isPending
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/dashboard">
+            <Link href="/queries">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              Back to Queries
             </Link>
           </Button>
           <div>
@@ -259,36 +262,6 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
           </CardContent>
         </Card>
 
-        {/* Execution Plan Panel */}
-        {/*<Card>
-          <CardHeader>
-            <CardTitle>Execution Plan Analysis</CardTitle>
-            <CardDescription>Compare current execution plan with optimized version</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="original" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="original">Original Plan</TabsTrigger>
-                <TabsTrigger value="hypothetical">Hypothetical Plan</TabsTrigger>
-              </TabsList>
-              <TabsContent value="original" className="space-y-4">
-                <div className="bg-muted p-4 rounded-lg">
-                  <pre className="text-sm font-mono whitespace-pre-wrap">{mockExecutionPlan.original}</pre>
-                </div>
-              </TabsContent>
-              <TabsContent value="hypothetical" className="space-y-4">
-                <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
-                  <pre className="text-sm font-mono whitespace-pre-wrap">{mockExecutionPlan.hypothetical}</pre>
-                </div>
-                <div className="flex items-center gap-2 text-primary">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="text-sm font-medium">87% performance improvement expected</span>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card> *}
-
         {/* AI Recommendations Panel */}
         <Card>
           <CardHeader>
@@ -299,7 +272,7 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
             <CardDescription>Get AI-powered insights for query optimization</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!aiRecommendations ? (
+            {!aiAnalysisResult ? (
               <Button onClick={handleAskAI} disabled={isLoadingAI} className="w-full">
                 {isLoadingAI ? (
                   <>
@@ -314,52 +287,73 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
                 )}
               </Button>
             ) : (
-              <div className="space-y-4">
-                <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
-                  <pre className="text-sm whitespace-pre-wrap">{aiRecommendations}</pre>
-                </div>
-              </div>
-            )}
+              <div className="space-y-6">
+                {/* General Description */}
+                {aiAnalysisResult.generalDescription && (
+                  <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
+                    <h3 className="font-semibold mb-2 flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-primary" />
+                      AI Analysis Summary
+                    </h3>
+                    <pre className="text-sm whitespace-pre-wrap">{aiAnalysisResult.generalDescription}</pre>
+                  </div>
+                )}
 
-            <Separator />
+                <Separator />
 
-            {/* Index Suggestions */}
-            <div>
-              <h3 className="font-semibold mb-3">Recommended Indexes</h3>
-              <div className="space-y-3">
-                {mockRecommendations.indexes.map((index, i) => (
-                  <Card key={i} className="p-4">
-                    <div className="flex items-center justify-between mb-2">
+                {/* Recommended Indexes */}
+                {aiAnalysisResult.recommendedIndexes && aiAnalysisResult.recommendedIndexes.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold mb-3">Recommended Indexes ({aiAnalysisResult.recommendedIndexes.length})</h3>
+                    <div className="space-y-3">
+                      {aiAnalysisResult.recommendedIndexes.map((index, i) => (
+                        <Card key={i} className="p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <Badge className={getPriorityColor(index.priority)} variant="secondary">
+                                {index.priority}
+                              </Badge>
+                              <div>
+                                <p className="font-medium">
+                                  {index.table} ({index.columns})
+                                </p>
+                                <p className="text-sm text-muted-foreground">{index.description}</p>
+                              </div>
+                            </div>
+                            <Button variant="outline" size="sm" onClick={() => copyToClipboard(index.sqlStatement)}>
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copy SQL
+                            </Button>
+                          </div>
+                          <div className="bg-muted p-2 rounded text-sm font-mono">{index.sqlStatement}</div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <Separator />
+
+                {/* Optimized Query */}
+                {aiAnalysisResult.optimizedQuery && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
                       <div>
-                        <p className="font-medium">
-                          {index.table}.{index.columns.join(", ")}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{index.impact}</p>
+                        <h3 className="font-semibold">Optimized Query</h3>
+                        <p className="text-sm text-muted-foreground">{aiAnalysisResult.optimizedQuery.description}</p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => copyToClipboard(index.sql)}>
+                      <Button variant="outline" size="sm" onClick={() => copyToClipboard(aiAnalysisResult.optimizedQuery.sqlStatement)}>
                         <Copy className="h-4 w-4 mr-2" />
                         Copy SQL
                       </Button>
                     </div>
-                    <div className="bg-muted p-2 rounded text-sm font-mono">{index.sql}</div>
-                  </Card>
-                ))}
+                    <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
+                      <pre className="text-sm font-mono whitespace-pre-wrap">{aiAnalysisResult.optimizedQuery.sqlStatement}</pre>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-
-            {/* Query Rewrite */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold">Optimized Query</h3>
-                <Button variant="outline" size="sm" onClick={() => copyToClipboard(mockRecommendations.queryRewrite)}>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy SQL
-                </Button>
-              </div>
-              <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
-                <pre className="text-sm font-mono whitespace-pre-wrap">{mockRecommendations.queryRewrite}</pre>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -371,13 +365,20 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-4">
-              <Button onClick={handleSimulateIndex} variant="outline">
+              <Button 
+                onClick={handleSimulateIndex} 
+                variant="outline" 
+                disabled={!aiAnalysisResult || !aiAnalysisResult.recommendedIndexes?.length}
+              >
                 <Play className="mr-2 h-4 w-4" />
-                Simulate Index
+                Simulate Recommended Indexes
               </Button>
-              <Button variant="outline">
+              <Button 
+                variant="outline" 
+                disabled={!aiAnalysisResult || !aiAnalysisResult.optimizedQuery}
+              >
                 <Play className="mr-2 h-4 w-4" />
-                Test Rewritten Query
+                Test Optimized Query
               </Button>
             </div>
 

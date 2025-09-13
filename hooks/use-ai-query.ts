@@ -1,8 +1,9 @@
 'use client'
 
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { getToken } from '@/lib/axios-config'
 
-const NEXT_PUBLIC_BACKEND_URL = process.env.NEXT_PUBLIC_NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+const NEXT_PUBLIC_BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
 interface AIQueryParams {
   prompt: string
@@ -15,7 +16,24 @@ interface AIOptimizeParams {
   schema?: string
 }
 
-// Hook for general AI queries (non-streaming)
+// Interface for analyze-query response (structured data from backend)
+interface AnalyzeQueryResponse {
+  success: boolean
+  generalDescription: string
+  recommendedIndexes: Array<{
+    table: string
+    columns: string
+    priority: string
+    description: string
+    sqlStatement: string
+  }>
+  optimizedQuery: {
+    description: string
+    sqlStatement: string
+  }
+}
+
+// Hook for general AI queries (streaming)
 export function useAIQuery() {
   return useMutation<string, Error, AIQueryParams>({
     mutationFn: async ({ prompt, system, model }) => {
@@ -25,10 +43,18 @@ export function useAIQuery() {
       let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
 
       try {
+        // Get JWT token for authentication
+        const token = getToken()
+        
+        if (!token) {
+          throw new Error('Authentication required. Please log in.')
+        }
+
         const response = await fetch(`${NEXT_PUBLIC_BACKEND_URL}/ai/stream`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             prompt,
@@ -41,6 +67,11 @@ export function useAIQuery() {
         clearTimeout(timeoutId)
 
         if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Authentication failed. Please log in again.')
+          } else if (response.status === 403) {
+            throw new Error('Access denied. Invalid token.')
+          }
           throw new Error(`HTTP error! status: ${response.status}`)
         }
 
@@ -104,7 +135,7 @@ export function useAIQuery() {
   })
 }
 
-// Hook for query optimization
+// Hook for query optimization (streaming)
 export function useQueryOptimization() {
   return useMutation<string, Error, AIOptimizeParams>({
     mutationFn: async ({ query, schema }) => {
@@ -124,10 +155,18 @@ export function useQueryOptimization() {
       let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
 
       try {
+        // Get JWT token for authentication
+        const token = getToken()
+        
+        if (!token) {
+          throw new Error('Authentication required. Please log in.')
+        }
+
         const response = await fetch(`${NEXT_PUBLIC_BACKEND_URL}/ai/stream`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             prompt: `Please analyze and optimize this SQL query:\n\n${query}`,
@@ -140,6 +179,11 @@ export function useQueryOptimization() {
         clearTimeout(timeoutId)
 
         if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Authentication failed. Please log in again.')
+          } else if (response.status === 403) {
+            throw new Error('Access denied. Invalid token.')
+          }
           throw new Error(`HTTP error! status: ${response.status}`)
         }
 
@@ -200,5 +244,49 @@ export function useQueryOptimization() {
         }
       }
     },
+  })
+}
+
+// NEW: Hook specifically for the /analyze-query endpoint (structured response)
+export function useAnalyzeQuery() {
+  return useMutation<AnalyzeQueryResponse, Error, { id: string }>({
+    mutationFn: async ({ id }) => {
+      const token = getToken()
+      
+      if (!token) {
+        throw new Error('Authentication required. Please log in.')
+      }
+
+      console.log("📡 Making authenticated request to /analyze-query with ID:", id);
+
+      const response = await fetch(`${NEXT_PUBLIC_BACKEND_URL}/ai/analyze-query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ id })
+      })
+
+      console.log("📥 Analyze query response:", response.status, response.statusText);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Please log in again.')
+        } else if (response.status === 403) {
+          throw new Error('Access denied. Invalid token.')
+        } else if (response.status === 400) {
+          throw new Error('Invalid query ID provided.')
+        } else if (response.status === 404) {
+          throw new Error('Query not found.')
+        }
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log("📊 Analysis result:", data);
+      
+      return data
+    }
   })
 }
