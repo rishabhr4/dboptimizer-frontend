@@ -297,7 +297,7 @@ export default function DashboardPage() {
                         <TableCell>
                           <span className="font-semibold">{query.avgTime}ms</span>
                         </TableCell>
-                        <TableCell>{query.frequency}/hr</TableCell>
+                        <TableCell>{query.frequency}</TableCell>
                         <TableCell>
                           <Badge className={getSeverityColor(query.severity)}>{query.severity}</Badge>
                         </TableCell>

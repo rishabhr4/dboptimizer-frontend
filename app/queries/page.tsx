@@ -171,7 +171,7 @@ export default function QueriesPage() {
                           <span className="font-semibold">{query.avgTime}ms</span>
                         </div>
                       </TableCell>
-                      <TableCell>{query.frequency}/hr</TableCell>
+                      <TableCell>{query.frequency}</TableCell>
                       <TableCell>
                         <Badge className={getSeverityColor(query.severity)}>{query.severity}</Badge>
                       </TableCell>
