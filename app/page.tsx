@@ -76,7 +76,7 @@ export default function OnboardingPage() {
     
     connectMutation.mutate({
       url: true,
-      database_url: "postgresql://postgres.uyljxgsbcccxutilgwak:iit.fun%40iit@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?pgbouncer=true"
+      database_url: "postgresql://postgres:shivanshura457@db.adoezfuhzssxqlidtslc.supabase.co:5432/postgres"
     })
   }
 
