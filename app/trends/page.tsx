@@ -4,72 +4,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { TrendingUp, TrendingDown, Bell } from "lucide-react"
+import { TrendingUp, TrendingDown, Bell, AlertTriangle } from "lucide-react"
 import QueryAlertPopup from "@/components/ui/alert-queries"
+import { useState, useEffect } from "react"
+import { useAuthenticatedQuery } from "@/hooks/use-authenticated-api"
+import Link from "next/link"
 
-// Mock data for trends and alerts
-const mockAlerts = [
-  {
-    id: 1,
-    type: "High Latency",
-    query: "SELECT u.*, p.title FROM users u JOIN posts p...",
-    timestamp: "2 minutes ago",
-    severity: "high",
-    threshold: "2000ms",
-    actual: "2450ms",
-  },
-  {
-    id: 2,
-    type: "Slow Query",
-    query: "SELECT COUNT(*) FROM orders o JOIN customers...",
-    timestamp: "15 minutes ago",
-    severity: "medium",
-    threshold: "1000ms",
-    actual: "1340ms",
-  },
-  {
-    id: 3,
-    type: "Index Missing",
-    query: "UPDATE inventory SET quantity = quantity - ?...",
-    timestamp: "1 hour ago",
-    severity: "low",
-    threshold: "N/A",
-    actual: "Recommendation",
-  },
-]
-
-const mockTrends = [
-  {
-    metric: "Average Query Latency",
-    current: "245ms",
-    change: "-12%",
-    trend: "down",
-    period: "Last 24h",
-  },
-  {
-    metric: "Query Frequency",
-    current: "15,420",
-    change: "+8%",
-    trend: "up",
-    period: "Last 24h",
-  },
-  {
-    metric: "Slow Queries Count",
-    current: "23",
-    change: "-35%",
-    trend: "down",
-    period: "Last 24h",
-  },
-  {
-    metric: "Database Connections",
-    current: "156",
-    change: "+5%",
-    trend: "up",
-    period: "Last 24h",
-  },
-]
 
 export default function TrendsPage() {
+  const [isMounted, setIsMounted] = useState(false)
+
+  // API call to get alerts
+  const { data: alertsData, isLoading: isLoadingAlerts, error: alertsError, refetch: refetchAlerts } = useAuthenticatedQuery('/alerts/query-with-alerts', {
+    enabled: typeof window !== 'undefined',
+    method: 'GET'
+  })
+
+  // Initialize on client side to prevent hydration issues
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "high":
@@ -156,9 +111,7 @@ export default function TrendsPage() {
               </CardTitle>
               <CardDescription>Recent performance alerts and notifications</CardDescription>
             </div>
-            <Button variant="outline" size="sm">
-              Configure Alerts
-            </Button>
+            <QueryAlertPopup />
           </div>
         </CardHeader>
         <CardContent>
@@ -169,42 +122,61 @@ export default function TrendsPage() {
                   <TableHead>Alert Type</TableHead>
                   <TableHead>Query</TableHead>
                   <TableHead>Threshold</TableHead>
-                  <TableHead>Actual</TableHead>
-                  <TableHead>Time</TableHead>
                   <TableHead>Severity</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockAlerts.map((alert) => (
-                  <TableRow key={alert.id}>
-                    <TableCell className="font-medium">{alert.type}</TableCell>
-                    <TableCell className="font-mono text-sm max-w-xs">
-                      {alert.query.length > 50 ? alert.query.substring(0, 50) + "..." : alert.query}
-                    </TableCell>
-                    <TableCell>{alert.threshold}</TableCell>
-                    <TableCell className="font-semibold">{alert.actual}</TableCell>
-                    <TableCell className="text-muted-foreground">{alert.timestamp}</TableCell>
-                    <TableCell>
-                      <Badge className={getSeverityColor(alert.severity)}>{alert.severity}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
-                        Investigate
-                      </Button>
+                {!isMounted ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      Loading...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : isLoadingAlerts ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      Loading alerts...
+                    </TableCell>
+                  </TableRow>
+                ) : alertsError ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-destructive">
+                      <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                      Error loading alerts: {alertsError.message}
+                    </TableCell>
+                  </TableRow>
+                ) : !alertsData?.queries?.length ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      No alerts found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  alertsData.queries.map((alert: any) => (
+                    <TableRow key={alert.id}>
+                      <TableCell className="font-medium">{alert.type}</TableCell>
+                      <TableCell className="font-mono text-sm max-w-xs">
+                        {alert.query.length > 50 ? alert.query.substring(0, 50) + "..." : alert.query}
+                      </TableCell>
+                      <TableCell>{alert.threshold}</TableCell>
+                      <TableCell>
+                        <Badge className={getSeverityColor(alert.severity)}>{alert.severity}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Link href={'/query-analysis/' + alert.id}><Button variant="ghost" size="sm">
+                          Investigate
+                        </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
-
-      {/* Alert Queries button at the bottom */}
-      <div className="flex justify-end">
-        <QueryAlertPopup />
-      </div>
     </div>
   )
 }

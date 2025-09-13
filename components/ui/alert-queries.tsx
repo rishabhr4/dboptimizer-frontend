@@ -16,27 +16,32 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import { useAuthenticatedMutation } from "@/hooks/use-authenticated-api"
 import { toast } from "@/components/ui/use-toast"
+import { Bell } from "lucide-react"
+import { useQueryClient } from "@tanstack/react-query"
 
 export default function QueryAlertPopup({ queryId }: { queryId?: string }) {
   const [query, setQuery] = useState("")
   const [email, setEmail] = useState("")
   const [open, setOpen] = useState(false)
+  const queryClient = useQueryClient()
 
   // Debug logging for component mount
   console.log("QueryAlertPopup rendering, queryId:", queryId)
 
   // Use authenticated mutation hook like in dashboard page
-  const { mutate: addAlert, isLoading } = useAuthenticatedMutation('/db/alerts', {
-    onMutate: (variables) => {
-      // This will fire immediately when mutation is triggered
-      console.log("Mutation starting with variables:", variables)
-    },
+  const { mutate: addAlert, isPending } = useAuthenticatedMutation('/alerts/enable', {
     onSuccess: (data) => {
       console.log("Alert created successfully:", data)
       toast({
         title: "Alert created successfully",
         description: "You will be notified when this query runs.",
       })
+      
+      // Invalidate the alerts query to refresh the UI instantly
+      queryClient.invalidateQueries({
+        queryKey: ['/alerts/query-with-alerts']
+      })
+      
       setOpen(false) // Close the dialog after submitting
       setQuery("") // Reset form
       setEmail("")
@@ -90,11 +95,12 @@ export default function QueryAlertPopup({ queryId }: { queryId?: string }) {
       setOpen(newOpenState)
     }}>
       <DialogTrigger asChild>
-        <Button 
+        <Button
           variant="outline"
           onClick={() => console.log("Trigger button clicked")}
         >
-          Add Alert
+          <Bell className="mr-2 h-4 w-4" />
+          Configure Alert
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
@@ -135,7 +141,7 @@ export default function QueryAlertPopup({ queryId }: { queryId?: string }) {
                   console.log("Cancel button clicked")
                   handleCancel()
                 }} 
-                disabled={isLoading}
+                disabled={isPending}
               >
                 Cancel
               </Button>
@@ -144,9 +150,9 @@ export default function QueryAlertPopup({ queryId }: { queryId?: string }) {
                   console.log("Save button clicked")
                   handleSubmit()
                 }} 
-                disabled={isLoading}
+                disabled={isPending}
               >
-                {isLoading ? "Saving..." : "Save Alert"}
+                {isPending ? "Saving..." : "Save Alert"}
               </Button>
             </DialogFooter>
           </CardContent>

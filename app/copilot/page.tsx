@@ -86,55 +86,19 @@ export default function CopilotPage() {
             </p>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <Database className="h-4 w-4 text-primary" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Queries Analyzed</p>
-                    <p className="font-semibold">1,247</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Avg Improvement</p>
-                    <p className="font-semibold">73%</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <Lightbulb className="h-4 w-4 text-primary" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Recommendations</p>
-                    <p className="font-semibold">89</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Chat Interface */}
           <Card className="h-[600px] flex flex-col">
-            <CardHeader>
+            <CardHeader className="flex-shrink-0">
               <CardTitle className="flex items-center gap-2">
                 <Bot className="h-5 w-5" />
                 AI Assistant
               </CardTitle>
               <CardDescription>Ask questions about database performance and optimization</CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col p-0">
-              {/* Messages */}
-              <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+            
+            {/* Messages - Scrollable Area */}
+            <div className="flex-1 min-h-0">
+              <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
                 <div className="space-y-4">
                   {messages.map((message) => (
                     <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : ""}`}>
@@ -172,7 +136,7 @@ export default function CopilotPage() {
                               <Badge
                                 key={index}
                                 variant="outline"
-                                className="cursor-pointer hover:bg-primary -primary-foreground transition-colors"
+                                className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
                                 onClick={() => handleSend(suggestion)}
                               >
                                 {suggestion}
@@ -217,23 +181,23 @@ export default function CopilotPage() {
                   )}
                 </div>
               </ScrollArea>
+            </div>
 
-              {/* Input */}
-              <div className="border-t p-4">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Ask about database performance, slow queries, indexes..."
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && handleSend()}
-                    disabled={isStreaming}
-                  />
-                  <Button onClick={() => handleSend()} disabled={!input.trim() || isStreaming}>
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </div>
+            {/* Input - Fixed at bottom */}
+            <div className="flex-shrink-0 border-t p-4">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Ask about database performance, slow queries, indexes..."
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSend()}
+                  disabled={isStreaming}
+                />
+                <Button onClick={() => handleSend()} disabled={!input.trim() || isStreaming}>
+                  <Send className="h-4 w-4" />
+                </Button>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </div>
       </div>

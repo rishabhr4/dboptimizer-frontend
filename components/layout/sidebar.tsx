@@ -33,12 +33,12 @@ const navigation = [
     icon: Bot,
     description: "AI-powered insights",
   },
-  {
-    name: "Settings",
-    href: "/settings",
-    icon: Settings,
-    description: "Database settings",
-  },
+  // {
+  //   name: "Settings",
+  //   href: "/settings",
+  //   icon: Settings,
+  //   description: "Database settings",
+  // },
 ]
 
 interface SidebarProps {
