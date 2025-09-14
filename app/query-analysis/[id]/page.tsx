@@ -1,11 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useAppSelector } from "@/lib/redux/hooks"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import {
   ArrowLeft,
@@ -18,15 +16,54 @@ import {
   CheckCircle,
   AlertTriangle,
   Zap,
+  Activity,
+  Timer,
+  BarChart3,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useAnalyzeQuery } from "@/hooks/use-ai-query"
+import { useAuthenticatedQuery } from "@/hooks/use-authenticated-api"
 
-// Mock data for the query analysis
-const mockQueryData = {
-  id: 1,
-  query: `SELECT u.id, u.name, u.email, p.title, p.content, p.created_at, 
+// Define the backend response type structure
+interface QueryLogData {
+  queryId: string
+  queryPreview: string
+  fullQuery: string
+  performance: {
+    averageTime: string
+    frequency: string
+    totalImpact: string
+    severity: string
+    threshold: string
+    minTime: string
+    maxTime: string
+  }
+  data: {
+    type: string
+    mainTable: string
+    rowsReturned: number
+    collectedAt: string
+  }
+  health: {
+    status: string
+    message: string
+    recommendation: string
+    priority: string
+  }
+}
+
+// Backend response wrapper
+interface QueryLogResponse {
+  success: boolean
+  data: QueryLogData
+}
+
+// Mock data for fallback
+const mockQueryData: QueryLogData = {
+  queryId: "1",
+  queryPreview: "SELECT u.id, u.name, u.email, p.title, p.content, p.created_at, COUNT(c.id) as comment_count, AVG(r.rating) as avg_rating FROM users u JOIN posts p ON u.id = p.user_id LEFT JOIN comments c ON p.id = c.post_id LEFT JOIN ratings r ON p.id = r.post_id WHERE u.created_at > '2024-01-01' AND p.status = 'published' GROUP BY u.id, p.id ORDER BY p.created_at DESC LIMIT 50",
+  fullQuery: `SELECT u.id, u.name, u.email, p.title, p.content, p.created_at, 
     COUNT(c.id) as comment_count, AVG(r.rating) as avg_rating
 FROM users u 
 JOIN posts p ON u.id = p.user_id 
@@ -37,48 +74,29 @@ WHERE u.created_at > '2024-01-01'
 GROUP BY u.id, p.id 
 ORDER BY p.created_at DESC 
 LIMIT 50`,
-  avgTime: 1250,
-  avgLatency: 1250,
-  frequency: 45,
-  rowsScanned: 125000,
-  lastRun: "2 minutes ago",
-  severity: "high" as const,
-}
-
-// AI Response Mock Data - matching the exact structure that will come from backend
-const mockAIResponse = {
-  success: true,
-  generalDescription: "Based on your query analysis, here are my recommendations:\n\n1. **Critical Index Missing**: The query is performing sequential scans on the users table. Adding an index on users.created_at will dramatically improve performance.\n\n2. **Join Order Optimization**: Moving the status filter into the JOIN condition will reduce the working set size earlier in the execution.\n\n3. **Aggregation Efficiency**: Including all selected columns in the GROUP BY clause will prevent potential issues and improve clarity.\n\n4. **Expected Performance Gain**: With the recommended indexes, this query should see a 85-90% reduction in execution time, from ~1250ms to ~150ms.\n\n5. **Monitoring Recommendation**: Set up alerts for queries exceeding 500ms execution time to catch performance regressions early.",
-  
-  recommendedIndexes: [
-    {
-      table: "users",
-      columns: "created_at",
-      priority: "High",
-      description: "Eliminates sequential scan on users table",
-      sqlStatement: "CREATE INDEX idx_users_created_at ON users (created_at);"
-    },
-    {
-      table: "posts",
-      columns: "user_id, status", 
-      priority: "High",
-      description: "Enables efficient join and filtering",
-      sqlStatement: "CREATE INDEX idx_posts_user_status ON posts (user_id, status);"
-    },
-    {
-      table: "comments",
-      columns: "post_id",
-      priority: "Medium", 
-      description: "Improves left join performance",
-      sqlStatement: "CREATE INDEX idx_comments_post_id ON comments (post_id);"
-    }
-  ],
-  
-  optimizedQuery: {
-    description: "Optimized version with better join order and filtering",
-    sqlStatement: "SELECT u.id, u.name, u.email, p.title, p.content, p.created_at, COUNT(c.id) as comment_count, AVG(r.rating) as avg_rating FROM users u INNER JOIN posts p ON u.id = p.user_id AND p.status = 'published' LEFT JOIN comments c ON p.id = c.post_id LEFT JOIN ratings r ON p.id = r.post_id WHERE u.created_at > '2024-01-01' GROUP BY u.id, u.name, u.email, p.title, p.content, p.created_at ORDER BY p.created_at DESC"
+  performance: {
+    averageTime: "1250ms",
+    frequency: "45 times",
+    totalImpact: "56s",
+    severity: "high",
+    threshold: "> 500ms",
+    minTime: "800ms",
+    maxTime: "2100ms"
+  },
+  data: {
+    type: "SELECT",
+    mainTable: "users",
+    rowsReturned: 50,
+    collectedAt: "2024-01-15T10:30:00Z"
+  },
+  health: {
+    status: "Warning",
+    message: "This query is moderately slow",
+    recommendation: "Monitor this query and consider optimization",
+    priority: "Medium"
   }
 }
+
 
 // Define the expected API response type to match your backend
 interface AnalyzeQueryResponse {
@@ -105,14 +123,17 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
   // Use the existing analyze query hook
   const analyzeQueryMutation = useAnalyzeQuery()
   
-  // Get selected query from Redux store
-  const { selectedQuery, queries } = useAppSelector(state => state.query)
+  // Fetch query data using authenticated API hook
+  const { data: queryData, isLoading: isLoadingQuery, error: queryError } = useAuthenticatedQuery<QueryLogResponse>(
+    `/db/query-log/${params.id}`,
+    {
+      enabled: !!params.id,
+      staleTime: 2 * 60 * 1000, // 2 minutes
+    }
+  )
   
-  // Find query by ID if selectedQuery is not available (direct URL access)
-  const currentQuery = selectedQuery || queries.find(q => q.id === parseInt(params.id))
-  
-  // Use currentQuery data or fallback to mock data if no query found
-  const queryData = currentQuery || mockQueryData
+  // Extract data from response wrapper or use fallback to mock data
+  const currentQueryData = queryData?.data || mockQueryData
 
   const handleAskAI = async () => {
     try {
@@ -142,9 +163,10 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
   }
 
   const handleSimulateIndex = () => {
-    const currentTime = queryData.avgLatency || queryData.avgTime || 1250
-    const improvedTime = Math.round(currentTime * 0.13) // 87% improvement
-    setSimulationResult(`Simulation complete! Expected performance improvement: 87% faster execution (${currentTime}ms → ${improvedTime}ms)`)
+    const averageTimeStr = currentQueryData?.performance?.averageTime || '1250ms'
+    const currentTimeMs = parseInt(averageTimeStr.replace('ms', ''))
+    const improvedTime = Math.round(currentTimeMs * 0.13) // 87% improvement
+    setSimulationResult(`Simulation complete! Expected performance improvement: 87% faster execution (${currentTimeMs}ms → ${improvedTime}ms)`)
     toast({
       title: "Index Simulation Complete",
       description: "Expected 87% performance improvement with recommended indexes",
@@ -210,55 +232,152 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Query Information</CardTitle>
-              <Badge className={getSeverityColor(queryData.severity)}>{queryData.severity} priority</Badge>
+              <Badge className={getSeverityColor(currentQueryData?.performance?.severity || 'low')}>
+                {currentQueryData?.performance?.severity || 'low'} priority
+              </Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Avg Latency</p>
-                  <p className="font-semibold">{queryData.avgLatency || queryData.avgTime}ms</p>
-                </div>
+            {isLoadingQuery ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Frequency</p>
-                  <p className="font-semibold">{queryData.frequency}</p>
-                </div>
+            ) : queryError ? (
+              <div className="text-center py-8">
+                <AlertTriangle className="h-8 w-8 text-destructive mx-auto mb-2" />
+                <p className="text-destructive">Failed to load query data</p>
+                <p className="text-sm text-muted-foreground">Using fallback data</p>
               </div>
-              <div className="flex items-center gap-2">
-                <Database className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Rows Scanned</p>
-                  <p className="font-semibold">{queryData.rowsScanned?.toLocaleString() || 'N/A'}</p>
+            ) : (
+              <>
+                {/* Performance Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Average Time</p>
+                      <p className="font-semibold">{currentQueryData?.performance?.averageTime || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Frequency</p>
+                      <p className="font-semibold">{currentQueryData?.performance?.frequency || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Timer className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Impact</p>
+                      <p className="font-semibold">{currentQueryData?.performance?.totalImpact || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Threshold</p>
+                      <p className="font-semibold">{currentQueryData?.performance?.threshold || 'N/A'}</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Last Run</p>
-                  <p className="font-semibold">{queryData.lastRun || 'N/A'}</p>
-                </div>
-              </div>
-            </div>
 
-            <Separator />
+                {/* Time Range */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Min Time</p>
+                      <p className="font-semibold">{currentQueryData?.performance?.minTime || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Max Time</p>
+                      <p className="font-semibold">{currentQueryData?.performance?.maxTime || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold">Full Query Text</h3>
-                <Button variant="outline" size="sm" onClick={() => copyToClipboard(queryData.query)}>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy
-                </Button>
-              </div>
-              <div className="bg-muted p-4 rounded-lg">
-                <pre className="text-sm font-mono whitespace-pre-wrap">{queryData.query}</pre>
-              </div>
-            </div>
+                <Separator />
+
+                {/* Data Information */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-center gap-2">
+                    <Database className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Query Type</p>
+                      <p className="font-semibold">{currentQueryData?.data?.type || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Database className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Main Table</p>
+                      <p className="font-semibold">{currentQueryData?.data?.mainTable || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Database className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Rows Returned</p>
+                      <p className="font-semibold">{currentQueryData?.data?.rowsReturned?.toLocaleString() || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Health Status */}
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Activity className="h-4 w-4" />
+                      Query Health
+                    </h3>
+                    <div className="flex gap-2">
+                      <Badge variant={
+                        currentQueryData?.health?.status === 'Healthy' ? 'default' : 
+                        currentQueryData?.health?.status === 'Warning' ? 'secondary' : 
+                        'destructive'
+                      }>
+                        {currentQueryData?.health?.status || 'Unknown'}
+                      </Badge>
+                      <Badge variant={
+                        currentQueryData?.health?.priority === 'Low' ? 'outline' : 
+                        currentQueryData?.health?.priority === 'Medium' ? 'secondary' : 
+                        'destructive'
+                      }>
+                        {currentQueryData?.health?.priority || 'Unknown'} Priority
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{currentQueryData?.health?.message || 'No health information available'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Recommendation:</p>
+                      <p className="text-sm text-primary font-medium">{currentQueryData?.health?.recommendation || 'No recommendations available'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold">Full Query Text</h3>
+                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(currentQueryData?.fullQuery || '')}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy
+                    </Button>
+                  </div>
+                  <div className="bg-muted p-4 rounded-lg">
+                    <pre className="text-sm font-mono whitespace-pre-wrap">{currentQueryData?.fullQuery || 'No query available'}</pre>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
