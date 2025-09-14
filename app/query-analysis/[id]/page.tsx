@@ -267,7 +267,7 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
                 <Separator />
 
                 {/* Data Information */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className={`grid grid-cols-1 md:grid-cols-${currentQueryData?.data?.mainTable && !currentQueryData.data.mainTable.includes(' ') ? '3' : '2'} gap-4`}>
                   <div className="flex items-center gap-2">
                     <Database className="h-4 w-4 text-muted-foreground" />
                     <div>
@@ -275,13 +275,15 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
                       <p className="font-semibold">{currentQueryData?.data?.type || 'N/A'}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Database className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Main Table</p>
-                      <p className="font-semibold">{currentQueryData?.data?.mainTable || 'N/A'}</p>
+                  {currentQueryData?.data?.mainTable && !currentQueryData.data.mainTable.includes(' ') && (
+                    <div className="flex items-center gap-2">
+                      <Database className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Main Table</p>
+                        <p className="font-semibold">{currentQueryData.data.mainTable}</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <Database className="h-4 w-4 text-muted-foreground" />
                     <div>
