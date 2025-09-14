@@ -38,6 +38,7 @@ What would you like to know about your database performance?`,
 export default function CopilotPage() {
   const [input, setInput] = useState("")
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
   
   // Use the custom AI chat hook
@@ -48,11 +49,27 @@ export default function CopilotPage() {
     initializeChat(initialMessages)
   }, [initializeChat])
 
+  // Auto-scroll when messages change
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
+
+  // Auto-scroll during streaming to show new content as it appears
+  useEffect(() => {
+    if (isStreaming) {
+      const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+      }
+      
+      // Scroll immediately
+      scrollToBottom()
+      
+      // Set up interval to keep scrolling during streaming
+      const scrollInterval = setInterval(scrollToBottom, 50) // More frequent for smoother experience
+      
+      return () => clearInterval(scrollInterval)
+    }
+  }, [isStreaming, messages]) // Also depend on messages to trigger during content updates
 
   const handleSend = async (message?: string) => {
     const messageText = message || input.trim()
@@ -176,6 +193,8 @@ export default function CopilotPage() {
                       </div>
                     </div>
                   )}
+                  {/* Invisible div to mark the end of messages for scrolling */}
+                  <div ref={messagesEndRef} />
                 </div>
               </ScrollArea>
             </div>

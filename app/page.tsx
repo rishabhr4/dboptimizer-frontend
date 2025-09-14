@@ -18,12 +18,12 @@ type ConnectionStatus = "idle" | "connecting" | "success" | "error"
 export default function OnboardingPage() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle")
   const [formData, setFormData] = useState({
-    host: "",
-    port: "",
-    username: "",
-    password: "",
-    dbName: "",
-    dbType: "",
+    host: "aws-1-ap-south-1.pooler.supabase.com",
+    port: "6543",
+    username: "postgres.adoezfuhzssxqlidtslc",
+    password: "shivanshura457",
+    dbName: "postgres",
+    dbType: "postgres",
   })
   const { toast } = useToast()
   const router = useRouter()
