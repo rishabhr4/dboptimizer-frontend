@@ -19,6 +19,7 @@ import {
   Activity,
   Timer,
   BarChart3,
+  Bot,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
@@ -365,13 +366,44 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
                     Ask AI for Optimization
                   </Button>
                 ) : (
-                  <div className="flex items-center justify-center gap-3 py-4">
-                    <div className="flex gap-1">
-                      <div className="h-2 w-2 bg-primary rounded-full animate-pulse"></div>
-                      <div className="h-2 w-2 bg-primary rounded-full animate-pulse [animation-delay:0.2s]"></div>
-                      <div className="h-2 w-2 bg-primary rounded-full animate-pulse [animation-delay:0.4s]"></div>
+                  <div className="flex flex-col items-center justify-center gap-4 py-8">
+                    {/* Robot Icon with Thinking Animation */}
+                    <div className="relative">
+                      <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                        <Bot className="h-8 w-8 text-primary animate-pulse" />
+                      </div>
+                      {/* Thinking Dots Animation */}
+                      <div className="absolute -top-2 -right-2 flex gap-1">
+                        <div className="h-2 w-2 bg-primary rounded-full animate-bounce [animation-delay:0s]"></div>
+                        <div className="h-2 w-2 bg-primary rounded-full animate-bounce [animation-delay:0.1s]"></div>
+                        <div className="h-2 w-2 bg-primary rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                      </div>
                     </div>
-                    <span className="text-md text-muted-foreground">AI IS THINKING...</span>
+                    
+                    {/* Thinking Text */}
+                    <div className="text-center space-y-2">
+                      <h3 className="text-lg font-semibold text-primary">🤖 AI Robot Thinking</h3>
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground animate-pulse">
+                          Thinking optimization preparing index optimization...
+                        </p>
+                        <p className="text-sm text-muted-foreground animate-pulse [animation-delay:0.5s]">
+                          Preparing query optimization...
+                        </p>
+                        <p className="text-sm text-muted-foreground animate-pulse [animation-delay:1s]">
+                          Analyzing performance patterns...
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Progress Bar */}
+                    <div className="w-full max-w-xs">
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full animate-pulse" style={{
+                          animation: 'progress 2s ease-in-out infinite'
+                        }}></div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </>
@@ -467,42 +499,6 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
                     </div>
                   </div>
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Query Replay Sandbox */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Query Replay Sandbox</CardTitle>
-            <CardDescription>Test optimizations before applying to production</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-4">
-              <Button 
-                onClick={handleSimulateIndex} 
-                variant="outline" 
-                disabled={!aiAnalysisResult || !aiAnalysisResult.recommendedIndexes?.length}
-              >
-                <Play className="mr-2 h-4 w-4" />
-                Simulate Recommended Indexes
-              </Button>
-              <Button 
-                variant="outline" 
-                disabled={!aiAnalysisResult || !aiAnalysisResult.optimizedQuery}
-              >
-                <Play className="mr-2 h-4 w-4" />
-                Test Optimized Query
-              </Button>
-            </div>
-
-            {simulationResult && (
-              <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
-                <div className="flex items-center gap-2 text-primary">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="font-medium">{simulationResult}</span>
-                </div>
               </div>
             )}
           </CardContent>
