@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Database, Search, Bot, Settings, Menu, X, Home, TrendingUp } from "lucide-react"
+import { Database, Search, Bot, Settings, X, Home, TrendingUp, ChevronRight } from "lucide-react"
 import { useDatabase } from "@/contexts/database-context"
 
 const navigation = [
@@ -51,7 +51,13 @@ export function Sidebar({ className }: SidebarProps) {
   const { dbName, username, isConnected } = useDatabase()
 
   return (
-    <div className={cn("flex flex-col h-full bg-sidebar border-r border-sidebar-border", className)}>
+    <div 
+      className={cn(
+        "flex flex-col h-full bg-sidebar border-r border-sidebar-border transition-all duration-300",
+        isCollapsed ? "w-[30%]" : "w-full", 
+        className
+      )}
+    >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
@@ -71,7 +77,7 @@ export function Sidebar({ className }: SidebarProps) {
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="text-sidebar-foreground hover:bg-sidebar-accent"
         >
-          {isCollapsed ? <Menu className="h-4 w-4" /> : <X className="h-4 w-4" />}
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <X className="h-4 w-4" />}
         </Button>
       </div>
 
@@ -86,6 +92,7 @@ export function Sidebar({ className }: SidebarProps) {
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer",
                   "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground",
+                  isCollapsed ? "justify-center" : ""
                 )}
               >
                 <item.icon className="h-4 w-4 shrink-0" />
@@ -105,7 +112,8 @@ export function Sidebar({ className }: SidebarProps) {
 
       {/* Footer */}
       <div className="p-4 border-t border-sidebar-border">
-        <div className="flex items-center gap-2 text-xs text-sidebar-foreground/60">
+        <div className={cn("flex items-center gap-2 text-xs text-sidebar-foreground/60", 
+                           isCollapsed && "justify-center")}>
           <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
           {!isCollapsed && (
             <span>
