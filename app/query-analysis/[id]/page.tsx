@@ -356,19 +356,23 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
           </CardHeader>
           <CardContent className="space-y-4">
             {!aiAnalysisResult ? (
-              <Button onClick={handleAskAI} disabled={isLoadingAI} className="w-full">
-                {isLoadingAI ? (
-                  <>
-                    <Zap className="mr-2 h-4 w-4 animate-pulse" />
-                    Analyzing with AI...
-                  </>
-                ) : (
-                  <>
+              <>
+                {!isLoadingAI ? (
+                  <Button onClick={handleAskAI} className="w-full">
                     <Lightbulb className="mr-2 h-4 w-4" />
                     Ask AI for Optimization
-                  </>
+                  </Button>
+                ) : (
+                  <div className="flex items-center justify-center gap-3 py-4">
+                    <div className="flex gap-1">
+                      <div className="h-2 w-2 bg-primary rounded-full animate-pulse"></div>
+                      <div className="h-2 w-2 bg-primary rounded-full animate-pulse [animation-delay:0.2s]"></div>
+                      <div className="h-2 w-2 bg-primary rounded-full animate-pulse [animation-delay:0.4s]"></div>
+                    </div>
+                    <span className="text-md text-muted-foreground">AI IS THINKING...</span>
+                  </div>
                 )}
-              </Button>
+              </>
             ) : (
               <div className="space-y-6">
                 {/* General Description */}
