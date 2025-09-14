@@ -123,3 +123,77 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Highlight.js theme for code syntax highlighting */
+@import 'highlight.js/styles/github.css';
+
+/* Custom prose styles for markdown */
+.prose {
+  color: inherit;
+  max-width: none;
+}
+
+.prose strong {
+  font-weight: 600;
+  color: inherit;
+}
+
+.prose code {
+  font-weight: 400;
+  color: inherit;
+}
+
+.prose pre {
+  background-color: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  color: inherit;
+}
+
+.prose blockquote {
+  border-left-color: hsl(var(--primary));
+  color: hsl(var(--muted-foreground));
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  color: inherit;
+}
+
+.prose p {
+  color: inherit;
+}
+
+.prose ul,
+.prose ol {
+  color: inherit;
+}
+
+.prose li {
+  color: inherit;
+}
+
+/* Dark mode adjustments for highlight.js */
+.dark .hljs {
+  background: hsl(var(--muted)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-literal,
+.dark .hljs-section,
+.dark .hljs-link {
+  color: hsl(var(--primary)) !important;
+}
+
+.dark .hljs-string {
+  color: #22c55e !important;
+}
+
+.dark .hljs-comment {
+  color: hsl(var(--muted-foreground)) !important;
+}

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Send, Bot, User, Copy, Lightbulb, Database, TrendingUp } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAIChat, type Message } from "@/hooks/use-ai-chat"
+import { Markdown } from "@/components/ui/markdown"
 
 const initialMessages: Message[] = [
   {
@@ -134,7 +135,9 @@ export default function CopilotPage() {
                               Copy
                             </Button>
                           )}
-                          <div className="whitespace-pre-wrap text-sm">{message.content}</div>
+                          <div className="text-sm">
+                            <Markdown>{message.content}</Markdown>
+                          </div>
                         </div>
                         {message.suggestions && (
                           <div className="mt-2 flex flex-wrap gap-2">

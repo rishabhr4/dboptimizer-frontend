@@ -24,6 +24,7 @@ import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useAnalyzeQuery } from "@/hooks/use-ai-query"
 import { useAuthenticatedQuery } from "@/hooks/use-authenticated-api"
+import { Markdown } from "@/components/ui/markdown"
 
 // Define the backend response type structure
 interface QueryLogData {
@@ -376,7 +377,9 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
                       <CheckCircle className="h-4 w-4 text-primary" />
                       AI Analysis Summary
                     </h3>
-                    <pre className="text-sm whitespace-pre-wrap">{aiAnalysisResult.generalDescription}</pre>
+                    <Markdown className="text-sm">
+                      {aiAnalysisResult.generalDescription}
+                    </Markdown>
                   </div>
                 )}
 
