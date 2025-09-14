@@ -100,7 +100,13 @@ export default function CopilotPage() {
             <div className="flex-1 min-h-0">
               <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
                 <div className="space-y-4">
-                  {messages.map((message) => (
+                  {messages.map((message) => {
+                    // Don't render the currently streaming message if it's empty
+                    if (isStreaming && message.id === messages[messages.length - 1]?.id && message.role === "assistant" && !message.content.trim()) {
+                      return null;
+                    }
+                    
+                    return (
                     <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : ""}`}>
                       {message.role === "assistant" && (
                         <Avatar className="h-8 w-8">
@@ -117,18 +123,18 @@ export default function CopilotPage() {
                               : "bg-muted text-muted-foreground"
                           }`}
                         >
-                          <div className="whitespace-pre-wrap text-sm">{message.content}</div>
-                          {message.role === "assistant" && (
+                          {message.role === "assistant" && !(isStreaming && message.id === messages[messages.length - 1]?.id) && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="mt-2 h-6 px-2 text-xs"
+                              className="mb-2 h-6 px-2 text-xs float-right"
                               onClick={() => copyToClipboard(message.content)}
                             >
                               <Copy className="h-3 w-3 mr-1" />
                               Copy
                             </Button>
                           )}
+                          <div className="whitespace-pre-wrap text-sm">{message.content}</div>
                         </div>
                         {message.suggestions && (
                           <div className="mt-2 flex flex-wrap gap-2">
@@ -153,8 +159,9 @@ export default function CopilotPage() {
                         </Avatar>
                       )}
                     </div>
-                  ))}
-                  {isStreaming && (
+                    )
+                  })}
+                    {isStreaming && (
                     <div className="flex gap-3">
                       <Avatar className="h-8 w-8">
                         <AvatarFallback className="bg-primary text-primary-foreground">
@@ -162,20 +169,7 @@ export default function CopilotPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="bg-muted rounded-lg p-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex space-x-1">
-                            <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-                            <div
-                              className="w-2 h-2 bg-primary rounded-full animate-bounce"
-                              style={{ animationDelay: "0.1s" }}
-                            ></div>
-                            <div
-                              className="w-2 h-2 bg-primary rounded-full animate-bounce"
-                              style={{ animationDelay: "0.2s" }}
-                            ></div>
-                          </div>
-                          <span className="text-sm text-muted-foreground">AI is thinking...</span>
-                        </div>
+                        <span className="text-sm text-muted-foreground">AI is thinking...</span>
                       </div>
                     </div>
                   )}
