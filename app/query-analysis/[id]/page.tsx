@@ -59,44 +59,6 @@ interface QueryLogResponse {
   data: QueryLogData
 }
 
-// Mock data for fallback
-const mockQueryData: QueryLogData = {
-  queryId: "1",
-  queryPreview: "SELECT u.id, u.name, u.email, p.title, p.content, p.created_at, COUNT(c.id) as comment_count, AVG(r.rating) as avg_rating FROM users u JOIN posts p ON u.id = p.user_id LEFT JOIN comments c ON p.id = c.post_id LEFT JOIN ratings r ON p.id = r.post_id WHERE u.created_at > '2024-01-01' AND p.status = 'published' GROUP BY u.id, p.id ORDER BY p.created_at DESC LIMIT 50",
-  fullQuery: `SELECT u.id, u.name, u.email, p.title, p.content, p.created_at, 
-    COUNT(c.id) as comment_count, AVG(r.rating) as avg_rating
-FROM users u 
-JOIN posts p ON u.id = p.user_id 
-LEFT JOIN comments c ON p.id = c.post_id 
-LEFT JOIN ratings r ON p.id = r.post_id 
-WHERE u.created_at > '2024-01-01' 
-  AND p.status = 'published'
-GROUP BY u.id, p.id 
-ORDER BY p.created_at DESC 
-LIMIT 50`,
-  performance: {
-    averageTime: "1250ms",
-    frequency: "45 times",
-    totalImpact: "56s",
-    severity: "high",
-    threshold: "> 500ms",
-    minTime: "800ms",
-    maxTime: "2100ms"
-  },
-  data: {
-    type: "SELECT",
-    mainTable: "users",
-    rowsReturned: 50,
-    collectedAt: "2024-01-15T10:30:00Z"
-  },
-  health: {
-    status: "Warning",
-    message: "This query is moderately slow",
-    recommendation: "Monitor this query and consider optimization",
-    priority: "Medium"
-  }
-}
-
 
 // Define the expected API response type to match your backend
 interface AnalyzeQueryResponse {
@@ -133,7 +95,7 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
   )
   
   // Extract data from response wrapper or use fallback to mock data
-  const currentQueryData = queryData?.data || mockQueryData
+  const currentQueryData = queryData?.data 
 
   const handleAskAI = async () => {
     try {
