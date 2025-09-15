@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useAnalyzeQuery } from "@/hooks/use-ai-query"
 import { useAuthenticatedQuery, useAuthenticatedMutation } from "@/hooks/use-authenticated-api"
 import { Markdown } from "@/components/ui/markdown"
-import Tree from 'react-d3-tree'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 // Define the backend response type structure
 interface QueryLogData {
@@ -103,45 +103,39 @@ interface QueryComparisonResponse {
   }
 }
 
-// Function to convert PostgreSQL EXPLAIN JSON to react-d3-tree format
-const convertPlanToTree = (plan: any): any => {
-  if (!plan || !plan.Plan) return null
+// Function to convert PostgreSQL EXPLAIN JSON to table format
+const convertPlanToTable = (plan: any): any[] => {
+  if (!plan || !plan.Plan) return []
 
-  const convertNode = (node: any): any => {
-    const treeNode: any = {
-      name: node["Node Type"] || "Unknown",
-      attributes: {}
-    }
+  const tableRows: any[] = []
+  let level = 0
 
-    // Add relevant attributes
-    if (node["Relation Name"]) {
-      treeNode.attributes.relation_name = node["Relation Name"]
+  const processNode = (node: any, parentLevel: number = 0) => {
+    const row = {
+      level: parentLevel,
+      nodeType: node["Node Type"] || "Unknown",
+      relationName: node["Relation Name"] || "-",
+      joinType: node["Join Type"] || "-",
+      indexName: node["Index Name"] || "-",
+      filter: node["Hash Cond"] || node["Filter"] || "-",
+      totalCost: node["Total Cost"] || 0,
+      planRows: node["Plan Rows"] || 0,
+      startupCost: node["Startup Cost"] || 0,
+      width: node["Plan Width"] || 0
     }
-    if (node["Join Type"]) {
-      treeNode.attributes.join_type = node["Join Type"]
-    }
-    if (node["Index Name"]) {
-      treeNode.attributes.index_name = node["Index Name"]
-    }
-    if (node["Hash Cond"]) {
-      treeNode.attributes.filter = node["Hash Cond"]
-    }
-    if (node["Total Cost"]) {
-      treeNode.attributes.total_cost = node["Total Cost"]
-    }
-    if (node["Plan Rows"]) {
-      treeNode.attributes.plan_rows = node["Plan Rows"]
-    }
+    
+    tableRows.push(row)
 
-    // Add children if they exist
+    // Process children
     if (node.Plans && node.Plans.length > 0) {
-      treeNode.children = node.Plans.map(convertNode).filter(Boolean)
+      node.Plans.forEach((child: any) => {
+        processNode(child, parentLevel + 1)
+      })
     }
-
-    return treeNode
   }
 
-  return convertNode(plan.Plan)
+  processNode(plan.Plan)
+  return tableRows
 }
 
 export default function QueryAnalysisPage({ params }: { params: { id: string } }) {
@@ -657,95 +651,49 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
                   <div className="space-y-2">
                     <h3 className="font-semibold text-lg">Original Query Plan</h3>
                     <div className="bg-muted/50 p-4 rounded-lg">
-                      <pre className="text-xs font-mono whitespace-pre-wrap mb-3">{comparisonResult.data.query1.sql}</pre>
-                      <div className="h-96 border rounded overflow-hidden">
-                        {comparisonResult.data.query1.plan && comparisonResult.data.query1.plan.length > 0 ? (
-                          <div className="w-full h-full flex justify-center">
-                            <Tree
-                              data={convertPlanToTree(comparisonResult.data.query1.plan[0])}
-                              orientation="vertical"
-                              pathFunc="step"
-                              translate={{ x: 200, y: 50 }}
-                              nodeSize={{ x: 200, y: 100 }}
-                              separation={{ siblings: 1, nonSiblings: 1 }}
-                              renderCustomNodeElement={({ nodeDatum, toggleNode }) => (
-                                <g>
-                                  <rect
-                                    width="180"
-                                    height="80"
-                                    x="-90"
-                                    y="-40"
-                                    fill="hsl(var(--card))"
-                                    stroke="hsl(var(--border))"
-                                    strokeWidth="2"
-                                    rx="6"
-                                    className="drop-shadow-sm"
-                                  />
-                                  <text
-                                    textAnchor="middle"
-                                    x="0"
-                                    y="-20"
-                                    fontSize="12"
-                                    fontWeight="600"
-                                    fill="white"
-                                  >
-                                    {nodeDatum.name || 'Node'}
-                                  </text>
-                                  {nodeDatum.attributes?.relation_name && (
-                                    <text
-                                      textAnchor="middle"
-                                      x="0"
-                                      y="-5"
-                                      fontSize="10"
-                                      fill="white"
-                                    >
-                                      Table: {nodeDatum.attributes.relation_name}
-                                    </text>
-                                  )}
-                                  {nodeDatum.attributes?.join_type && (
-                                    <text
-                                      textAnchor="middle"
-                                      x="0"
-                                      y="8"
-                                      fontSize="10"
-                                      fill="white"
-                                    >
-                                      Join: {nodeDatum.attributes.join_type}
-                                    </text>
-                                  )}
-                                  {nodeDatum.attributes?.filter && (
-                                    <text
-                                      textAnchor="middle"
-                                      x="0"
-                                      y="21"
-                                      fontSize="9"
-                                      fill="white"
-                                    >
-                                      Filter: {nodeDatum.attributes.filter}
-                                    </text>
-                                  )}
-                                  {nodeDatum.attributes?.total_cost && (
-                                    <text
-                                      textAnchor="middle"
-                                      x="0"
-                                      y="34"
-                                      fontSize="9"
-                                      fill="#60a5fa"
-                                      fontWeight="500"
-                                    >
-                                      Cost: {nodeDatum.attributes.total_cost}
-                                    </text>
-                                  )}
-                                </g>
-                              )}
-                            />
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center h-full text-muted-foreground">
-                            No plan data available
-                          </div>
-                        )}
-                      </div>
+                      <pre className="text-xs font-mono whitespace-pre-wrap mb-4">{comparisonResult.data.query1.sql}</pre>
+                      {comparisonResult.data.query1.plan && comparisonResult.data.query1.plan.length > 0 ? (
+                        <div className="border rounded-lg overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-8">Level</TableHead>
+                                <TableHead className="w-32">Node Type</TableHead>
+                                <TableHead className="w-24">Table</TableHead>
+                                <TableHead className="w-20">Join Type</TableHead>
+                                <TableHead className="w-24">Index</TableHead>
+                                <TableHead className="w-40">Filter</TableHead>
+                                <TableHead className="w-20">Total Cost</TableHead>
+                                <TableHead className="w-20">Rows</TableHead>
+                                <TableHead className="w-20">Width</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {convertPlanToTable(comparisonResult.data.query1.plan[0]).map((row, index) => (
+                                <TableRow key={index} className={row.level > 0 ? "bg-muted/30" : ""}>
+                                  <TableCell className="font-mono text-xs">
+                                    {row.level > 0 ? "└─".repeat(row.level) : ""}
+                                  </TableCell>
+                                  <TableCell className="font-medium">{row.nodeType}</TableCell>
+                                  <TableCell className="text-muted-foreground">{row.relationName}</TableCell>
+                                  <TableCell className="text-muted-foreground">{row.joinType}</TableCell>
+                                  <TableCell className="text-muted-foreground">{row.indexName}</TableCell>
+                                  <TableCell className="text-muted-foreground text-xs font-mono max-w-40 truncate" title={row.filter}>
+                                    {row.filter}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-primary font-medium">{row.totalCost}</TableCell>
+                                  <TableCell className="font-mono text-muted-foreground">{row.planRows.toLocaleString()}</TableCell>
+                                  <TableCell className="font-mono text-muted-foreground">{row.width}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center h-32 text-muted-foreground">
+                          No plan data available
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -753,95 +701,49 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
                   <div className="space-y-2">
                     <h3 className="font-semibold text-lg">Optimized Query Plan</h3>
                     <div className="bg-muted/50 p-4 rounded-lg">
-                      <pre className="text-xs font-mono whitespace-pre-wrap mb-3">{comparisonResult.data.query2.sql}</pre>
-                      <div className="h-96 border rounded overflow-hidden">
-                        {comparisonResult.data.query2.plan && comparisonResult.data.query2.plan.length > 0 ? (
-                          <div className="w-full h-full flex justify-center">
-                            <Tree
-                              data={convertPlanToTree(comparisonResult.data.query2.plan[0])}
-                              orientation="vertical"
-                              pathFunc="step"
-                              translate={{ x: 200, y: 50 }}
-                              nodeSize={{ x: 200, y: 100 }}
-                              separation={{ siblings: 1, nonSiblings: 1 }}
-                              renderCustomNodeElement={({ nodeDatum, toggleNode }) => (
-                                <g>
-                                  <rect
-                                    width="180"
-                                    height="80"
-                                    x="-90"
-                                    y="-40"
-                                    fill="hsl(var(--card))"
-                                    stroke="hsl(var(--border))"
-                                    strokeWidth="2"
-                                    rx="6"
-                                    className="drop-shadow-sm"
-                                  />
-                                  <text
-                                    textAnchor="middle"
-                                    x="0"
-                                    y="-20"
-                                    fontSize="12"
-                                    fontWeight="600"
-                                    fill="white"
-                                  >
-                                    {nodeDatum.name || 'Node'}
-                                  </text>
-                                  {nodeDatum.attributes?.relation_name && (
-                                    <text
-                                      textAnchor="middle"
-                                      x="0"
-                                      y="-5"
-                                      fontSize="10"
-                                      fill="white"
-                                    >
-                                      Table: {nodeDatum.attributes.relation_name}
-                                    </text>
-                                  )}
-                                  {nodeDatum.attributes?.join_type && (
-                                    <text
-                                      textAnchor="middle"
-                                      x="0"
-                                      y="8"
-                                      fontSize="10"
-                                      fill="white"
-                                    >
-                                      Join: {nodeDatum.attributes.join_type}
-                                    </text>
-                                  )}
-                                  {nodeDatum.attributes?.filter && (
-                                    <text
-                                      textAnchor="middle"
-                                      x="0"
-                                      y="21"
-                                      fontSize="9"
-                                      fill="white"
-                                    >
-                                      Filter: {nodeDatum.attributes.filter}
-                                    </text>
-                                  )}
-                                  {nodeDatum.attributes?.total_cost && (
-                                    <text
-                                      textAnchor="middle"
-                                      x="0"
-                                      y="34"
-                                      fontSize="9"
-                                      fill="#60a5fa"
-                                      fontWeight="500"
-                                    >
-                                      Cost: {nodeDatum.attributes.total_cost}
-                                    </text>
-                                  )}
-                                </g>
-                              )}
-                            />
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center h-full text-muted-foreground">
-                            No plan data available
-                          </div>
-                        )}
-                      </div>
+                      <pre className="text-xs font-mono whitespace-pre-wrap mb-4">{comparisonResult.data.query2.sql}</pre>
+                      {comparisonResult.data.query2.plan && comparisonResult.data.query2.plan.length > 0 ? (
+                        <div className="border rounded-lg overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-8">Level</TableHead>
+                                <TableHead className="w-32">Node Type</TableHead>
+                                <TableHead className="w-24">Table</TableHead>
+                                <TableHead className="w-20">Join Type</TableHead>
+                                <TableHead className="w-24">Index</TableHead>
+                                <TableHead className="w-40">Filter</TableHead>
+                                <TableHead className="w-20">Total Cost</TableHead>
+                                <TableHead className="w-20">Rows</TableHead>
+                                <TableHead className="w-20">Width</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {convertPlanToTable(comparisonResult.data.query2.plan[0]).map((row, index) => (
+                                <TableRow key={index} className={row.level > 0 ? "bg-muted/30" : ""}>
+                                  <TableCell className="font-mono text-xs">
+                                    {row.level > 0 ? "└─".repeat(row.level) : ""}
+                                  </TableCell>
+                                  <TableCell className="font-medium">{row.nodeType}</TableCell>
+                                  <TableCell className="text-muted-foreground">{row.relationName}</TableCell>
+                                  <TableCell className="text-muted-foreground">{row.joinType}</TableCell>
+                                  <TableCell className="text-muted-foreground">{row.indexName}</TableCell>
+                                  <TableCell className="text-muted-foreground text-xs font-mono max-w-40 truncate" title={row.filter}>
+                                    {row.filter}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-primary font-medium">{row.totalCost}</TableCell>
+                                  <TableCell className="font-mono text-muted-foreground">{row.planRows.toLocaleString()}</TableCell>
+                                  <TableCell className="font-mono text-muted-foreground">{row.width}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center h-32 text-muted-foreground">
+                          No plan data available
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
