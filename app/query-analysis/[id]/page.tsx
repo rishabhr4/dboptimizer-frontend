@@ -24,8 +24,9 @@ import {
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useAnalyzeQuery } from "@/hooks/use-ai-query"
-import { useAuthenticatedQuery } from "@/hooks/use-authenticated-api"
+import { useAuthenticatedQuery, useAuthenticatedMutation } from "@/hooks/use-authenticated-api"
 import { Markdown } from "@/components/ui/markdown"
+import Tree from 'react-d3-tree'
 
 // Define the backend response type structure
 interface QueryLogData {
@@ -80,13 +81,102 @@ interface AnalyzeQueryResponse {
   }
 }
 
+// Query comparison types
+interface QueryComparisonRequest {
+  query1: string
+  query2: string
+}
+
+interface QueryComparisonResponse {
+  success: boolean
+  data: {
+    query1: {
+      sql: string
+      plan: any[]
+      error: string | null
+    }
+    query2: {
+      sql: string
+      plan: any[]
+      error: string | null
+    }
+  }
+}
+
+// Function to convert PostgreSQL EXPLAIN JSON to react-d3-tree format
+const convertPlanToTree = (plan: any): any => {
+  if (!plan || !plan.Plan) return null
+
+  const convertNode = (node: any): any => {
+    const treeNode: any = {
+      name: node["Node Type"] || "Unknown",
+      attributes: {}
+    }
+
+    // Add relevant attributes
+    if (node["Relation Name"]) {
+      treeNode.attributes.relation_name = node["Relation Name"]
+    }
+    if (node["Join Type"]) {
+      treeNode.attributes.join_type = node["Join Type"]
+    }
+    if (node["Index Name"]) {
+      treeNode.attributes.index_name = node["Index Name"]
+    }
+    if (node["Hash Cond"]) {
+      treeNode.attributes.filter = node["Hash Cond"]
+    }
+    if (node["Total Cost"]) {
+      treeNode.attributes.total_cost = node["Total Cost"]
+    }
+    if (node["Plan Rows"]) {
+      treeNode.attributes.plan_rows = node["Plan Rows"]
+    }
+
+    // Add children if they exist
+    if (node.Plans && node.Plans.length > 0) {
+      treeNode.children = node.Plans.map(convertNode).filter(Boolean)
+    }
+
+    return treeNode
+  }
+
+  return convertNode(plan.Plan)
+}
+
 export default function QueryAnalysisPage({ params }: { params: { id: string } }) {
   const [aiAnalysisResult, setAiAnalysisResult] = useState<AnalyzeQueryResponse | null>(null)
   const [simulationResult, setSimulationResult] = useState<string>("")
+  const [comparisonResult, setComparisonResult] = useState<QueryComparisonResponse | null>(null)
+  const [isComparing, setIsComparing] = useState(false)
   const { toast } = useToast()
   
   // Use the existing analyze query hook
   const analyzeQueryMutation = useAnalyzeQuery()
+  
+  // Query comparison mutation
+  const compareQueriesMutation = useAuthenticatedMutation<QueryComparisonResponse, QueryComparisonRequest>(
+    '/db/compare-queries',
+    {
+      method: 'POST',
+      onSuccess: (data) => {
+        setComparisonResult(data)
+        setIsComparing(false)
+        toast({
+          title: "Query Comparison Complete",
+          description: "Execution plans generated successfully",
+        })
+      },
+      onError: (error) => {
+        setIsComparing(false)
+        toast({
+          title: "Comparison Failed",
+          description: error.message || "Failed to compare queries. Please try again.",
+          variant: "destructive"
+        })
+      }
+    }
+  )
   
   // Fetch query data using authenticated API hook
   const { data: queryData, isLoading: isLoadingQuery, error: queryError } = useAuthenticatedQuery<QueryLogResponse>(
@@ -136,6 +226,27 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
       title: "Index Simulation Complete",
       description: "Expected 87% performance improvement with recommended indexes",
     })
+  }
+
+  const handleCompareQueries = async () => {
+    if (!currentQueryData?.fullQuery || !aiAnalysisResult?.optimizedQuery?.sqlStatement) {
+      toast({
+        title: "Cannot Compare Queries",
+        description: "Both original and optimized queries are required for comparison",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsComparing(true)
+    try {
+      await compareQueriesMutation.mutateAsync({
+        query1: currentQueryData.fullQuery,
+        query2: aiAnalysisResult.optimizedQuery.sqlStatement
+      })
+    } catch (error) {
+      // Error handling is done in the mutation's onError callback
+    }
   }
 
   const copyToClipboard = (text: string) => {
@@ -503,6 +614,242 @@ export default function QueryAnalysisPage({ params }: { params: { id: string } }
             )}
           </CardContent>
         </Card>
+
+        {/* Query Comparison - Only show after AI analysis */}
+        {aiAnalysisResult && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Query Execution Plan Comparison
+              </CardTitle>
+              <CardDescription>Compare the original query with the AI-optimized version</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-4">
+                <Button 
+                  onClick={handleCompareQueries} 
+                  disabled={isComparing || !currentQueryData?.fullQuery || !aiAnalysisResult?.optimizedQuery?.sqlStatement}
+                  className="w-full"
+                >
+                  {isComparing ? (
+                    <>
+                      <div className="flex gap-1 mr-2">
+                        <div className="h-2 w-2 bg-white rounded-full animate-pulse"></div>
+                        <div className="h-2 w-2 bg-white rounded-full animate-pulse [animation-delay:0.2s]"></div>
+                        <div className="h-2 w-2 bg-white rounded-full animate-pulse [animation-delay:0.4s]"></div>
+                      </div>
+                      Comparing Queries...
+                    </>
+                  ) : (
+                    <>
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Compare Original vs Optimized
+                    </>
+                  )}
+                </Button>
+              </div>
+
+            {comparisonResult && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Original Query Plan */}
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-lg">Original Query Plan</h3>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <pre className="text-xs font-mono whitespace-pre-wrap mb-3">{comparisonResult.data.query1.sql}</pre>
+                      <div className="h-96 border rounded overflow-hidden">
+                        {comparisonResult.data.query1.plan && comparisonResult.data.query1.plan.length > 0 ? (
+                          <div className="w-full h-full flex justify-center">
+                            <Tree
+                              data={convertPlanToTree(comparisonResult.data.query1.plan[0])}
+                              orientation="vertical"
+                              pathFunc="step"
+                              translate={{ x: 200, y: 50 }}
+                              nodeSize={{ x: 200, y: 100 }}
+                              separation={{ siblings: 1, nonSiblings: 1 }}
+                              renderCustomNodeElement={({ nodeDatum, toggleNode }) => (
+                                <g>
+                                  <rect
+                                    width="180"
+                                    height="80"
+                                    x="-90"
+                                    y="-40"
+                                    fill="hsl(var(--card))"
+                                    stroke="hsl(var(--border))"
+                                    strokeWidth="2"
+                                    rx="6"
+                                    className="drop-shadow-sm"
+                                  />
+                                  <text
+                                    textAnchor="middle"
+                                    x="0"
+                                    y="-20"
+                                    fontSize="12"
+                                    fontWeight="600"
+                                    fill="white"
+                                  >
+                                    {nodeDatum.name || 'Node'}
+                                  </text>
+                                  {nodeDatum.attributes?.relation_name && (
+                                    <text
+                                      textAnchor="middle"
+                                      x="0"
+                                      y="-5"
+                                      fontSize="10"
+                                      fill="white"
+                                    >
+                                      Table: {nodeDatum.attributes.relation_name}
+                                    </text>
+                                  )}
+                                  {nodeDatum.attributes?.join_type && (
+                                    <text
+                                      textAnchor="middle"
+                                      x="0"
+                                      y="8"
+                                      fontSize="10"
+                                      fill="white"
+                                    >
+                                      Join: {nodeDatum.attributes.join_type}
+                                    </text>
+                                  )}
+                                  {nodeDatum.attributes?.filter && (
+                                    <text
+                                      textAnchor="middle"
+                                      x="0"
+                                      y="21"
+                                      fontSize="9"
+                                      fill="white"
+                                    >
+                                      Filter: {nodeDatum.attributes.filter}
+                                    </text>
+                                  )}
+                                  {nodeDatum.attributes?.total_cost && (
+                                    <text
+                                      textAnchor="middle"
+                                      x="0"
+                                      y="34"
+                                      fontSize="9"
+                                      fill="#60a5fa"
+                                      fontWeight="500"
+                                    >
+                                      Cost: {nodeDatum.attributes.total_cost}
+                                    </text>
+                                  )}
+                                </g>
+                              )}
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                            No plan data available
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Optimized Query Plan */}
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-lg">Optimized Query Plan</h3>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <pre className="text-xs font-mono whitespace-pre-wrap mb-3">{comparisonResult.data.query2.sql}</pre>
+                      <div className="h-96 border rounded overflow-hidden">
+                        {comparisonResult.data.query2.plan && comparisonResult.data.query2.plan.length > 0 ? (
+                          <div className="w-full h-full flex justify-center">
+                            <Tree
+                              data={convertPlanToTree(comparisonResult.data.query2.plan[0])}
+                              orientation="vertical"
+                              pathFunc="step"
+                              translate={{ x: 200, y: 50 }}
+                              nodeSize={{ x: 200, y: 100 }}
+                              separation={{ siblings: 1, nonSiblings: 1 }}
+                              renderCustomNodeElement={({ nodeDatum, toggleNode }) => (
+                                <g>
+                                  <rect
+                                    width="180"
+                                    height="80"
+                                    x="-90"
+                                    y="-40"
+                                    fill="hsl(var(--card))"
+                                    stroke="hsl(var(--border))"
+                                    strokeWidth="2"
+                                    rx="6"
+                                    className="drop-shadow-sm"
+                                  />
+                                  <text
+                                    textAnchor="middle"
+                                    x="0"
+                                    y="-20"
+                                    fontSize="12"
+                                    fontWeight="600"
+                                    fill="white"
+                                  >
+                                    {nodeDatum.name || 'Node'}
+                                  </text>
+                                  {nodeDatum.attributes?.relation_name && (
+                                    <text
+                                      textAnchor="middle"
+                                      x="0"
+                                      y="-5"
+                                      fontSize="10"
+                                      fill="white"
+                                    >
+                                      Table: {nodeDatum.attributes.relation_name}
+                                    </text>
+                                  )}
+                                  {nodeDatum.attributes?.join_type && (
+                                    <text
+                                      textAnchor="middle"
+                                      x="0"
+                                      y="8"
+                                      fontSize="10"
+                                      fill="white"
+                                    >
+                                      Join: {nodeDatum.attributes.join_type}
+                                    </text>
+                                  )}
+                                  {nodeDatum.attributes?.filter && (
+                                    <text
+                                      textAnchor="middle"
+                                      x="0"
+                                      y="21"
+                                      fontSize="9"
+                                      fill="white"
+                                    >
+                                      Filter: {nodeDatum.attributes.filter}
+                                    </text>
+                                  )}
+                                  {nodeDatum.attributes?.total_cost && (
+                                    <text
+                                      textAnchor="middle"
+                                      x="0"
+                                      y="34"
+                                      fontSize="9"
+                                      fill="#60a5fa"
+                                      fontWeight="500"
+                                    >
+                                      Cost: {nodeDatum.attributes.total_cost}
+                                    </text>
+                                  )}
+                                </g>
+                              )}
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                            No plan data available
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        )}
       </div>
     </div>
   )
